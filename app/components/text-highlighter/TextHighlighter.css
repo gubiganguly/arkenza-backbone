@@ -1,0 +1,21 @@
+.text-container {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  
+  .text-container span {
+    cursor: pointer;
+  }
+  
+  .text-container .highlight {
+    background-color: red;
+    color: white;
+    border-radius: 4px;
+  }
+  
+  .text-container .highlight-hover:hover {
+    background-color: rgba(255, 0, 0, 0.358);
+    color: white;
+    border-radius: 4px;
+  }
+  
