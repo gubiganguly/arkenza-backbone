@@ -1,12 +1,13 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import Link from "next/link"
-import { ArrowLeft, Plus, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Plus, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { useAppState } from "../contexts/AppStateContext";
 
 // Predefined interests that we suggest to users
 const SUGGESTED_INTERESTS = [
@@ -22,38 +23,41 @@ const SUGGESTED_INTERESTS = [
   "Science",
   "History",
   "Politics",
-]
+];
 
 export default function InterestsPage() {
-  const [interests, setInterests] = useState<string[]>([])
-  const [newInterest, setNewInterest] = useState("")
+  const { state, setInterests } = useAppState();
+  const [newInterest, setNewInterest] = useState("");
 
   const addInterest = (interest: string) => {
-    const trimmedInterest = interest.trim()
-    if (trimmedInterest && !interests.includes(trimmedInterest)) {
-      const newInterests = [...interests, trimmedInterest]
-      setInterests(newInterests)
-      console.log("Interests updated:", newInterests)
+    const trimmedInterest = interest.trim();
+    if (trimmedInterest && !state.interests.includes(trimmedInterest)) {
+      const newInterests = [...state.interests, trimmedInterest];
+      setInterests(newInterests);
     }
-    setNewInterest("")
-  }
+    setNewInterest("");
+  };
 
   const removeInterest = (interest: string) => {
-    const newInterests = interests.filter((i) => i !== interest)
-    setInterests(newInterests)
-    console.log("Interests updated:", newInterests)
-  }
+    const newInterests = state.interests.filter((i) => i !== interest);
+    setInterests(newInterests);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    addInterest(newInterest)
-  }
+    e.preventDefault();
+    addInterest(newInterest);
+  };
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-blue-50 to-white p-8">
       {/* Back button */}
       <div className="absolute left-8 top-8">
-        <Button variant="ghost" size="sm" asChild className="gap-2 text-gray-600 hover:text-gray-900">
+        <Button
+          variant="ghost"
+          size="sm"
+          asChild
+          className="gap-2 text-gray-600 hover:text-gray-900"
+        >
           <Link href="/">
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
@@ -64,18 +68,26 @@ export default function InterestsPage() {
       <div className="mx-auto max-w-2xl pt-16">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-blue-950">Your Interests</h1>
-          <p className="mt-2 text-gray-600">Select or add topics you're interested in discussing</p>
+          <p className="mt-2 text-gray-600">
+            Select or add topics you're interested in discussing
+          </p>
         </div>
 
         <Card className="mb-8 p-6">
           <div className="mb-6">
             <h2 className="mb-3 font-semibold">Your Selected Interests</h2>
             <div className="flex flex-wrap gap-2">
-              {interests.length === 0 ? (
-                <p className="text-sm text-gray-500">No interests selected yet. Add some below!</p>
+              {state.interests.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No interests selected yet. Add some below!
+                </p>
               ) : (
-                interests.map((interest) => (
-                  <Badge key={interest} variant="secondary" className="gap-1 px-3 py-1.5">
+                state.interests.map((interest) => (
+                  <Badge
+                    key={interest}
+                    variant="secondary"
+                    className="gap-1 px-3 py-1.5"
+                  >
                     {interest}
                     <button
                       onClick={() => removeInterest(interest)}
@@ -110,7 +122,9 @@ export default function InterestsPage() {
           <div>
             <h2 className="mb-3 font-semibold">Suggested Interests</h2>
             <div className="flex flex-wrap gap-2">
-              {SUGGESTED_INTERESTS.filter((interest) => !interests.includes(interest)).map((interest) => (
+              {SUGGESTED_INTERESTS.filter(
+                (interest) => !state.interests.includes(interest)
+              ).map((interest) => (
                 <Badge
                   key={interest}
                   variant="outline"
@@ -131,6 +145,5 @@ export default function InterestsPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
-

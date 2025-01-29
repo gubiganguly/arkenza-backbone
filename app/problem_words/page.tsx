@@ -5,18 +5,19 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TextHighlighter from "../components/text-highlighter/TextHighlighter";
+import { useAppState } from "../contexts/AppStateContext";
 
 const text = `There are many words that are difficult for me to pronounce. I need to identify them and practice them.`;
 
 export default function ProblemWords() {
-  const [highlightedWords, setHighlightedWords] = useState<string[]>([]);
+  const { state, setProblemWords } = useAppState();
 
   const addBadWord = (word: string) => {
-    setHighlightedWords([...highlightedWords, word]);
+    setProblemWords([...state.problemWords, word]);
   };
 
   const removeBadWord = (word: string) => {
-    setHighlightedWords(highlightedWords.filter((w) => w !== word));
+    setProblemWords(state.problemWords.filter((w) => w !== word));
   };
 
   return (
@@ -46,7 +47,7 @@ export default function ProblemWords() {
 
         <TextHighlighter
           text={text}
-          highlightedWords={highlightedWords}
+          highlightedWords={state.problemWords}
           addBadWord={addBadWord}
           removeBadWord={removeBadWord}
         />
