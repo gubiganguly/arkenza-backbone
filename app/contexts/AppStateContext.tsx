@@ -18,17 +18,34 @@ const AppStateContext = createContext<AppStateContextType | undefined>(
 );
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>({
-    problemWords: [],
-    interests: [],
+  const [state, setState] = useState<AppState>(() => {
+    // Load initial state from localStorage if available
+    if (typeof window !== "undefined") {
+      const savedState = localStorage.getItem("appState");
+      if (savedState) {
+        return JSON.parse(savedState);
+      }
+    }
+    return {
+      problemWords: [],
+      interests: [],
+    };
   });
 
   const setProblemWords = (words: string[]) => {
-    setState((prev) => ({ ...prev, problemWords: words }));
+    setState((prev) => {
+      const newState = { ...prev, problemWords: words };
+      localStorage.setItem("appState", JSON.stringify(newState));
+      return newState;
+    });
   };
 
   const setInterests = (interests: string[]) => {
-    setState((prev) => ({ ...prev, interests: interests }));
+    setState((prev) => {
+      const newState = { ...prev, interests: interests };
+      localStorage.setItem("appState", JSON.stringify(newState));
+      return newState;
+    });
   };
 
   return (

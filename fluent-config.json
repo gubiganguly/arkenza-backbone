@@ -1,0 +1,91 @@
+{
+  "pages": [
+    {
+      "type": "Welcome"
+    },
+    {
+      "type": "About",
+      "title": "About"
+    },
+    {
+      "type": "Collect Interests",
+      "title": "Collect Interests"
+    },
+    {
+      "type": "Input Bad Words",
+      "title": "Input Bad Words"
+    },
+    {
+      "type": "GSE",
+      "number": 1,
+      "title": "Read Sanitized Text Alone",
+      "GSEType": "sanitize_text",
+      "text": [
+        "In this module something else, you will read a text passage out loud. It is generated with AI and does not contain any of the \"problematic\" words you selected.",
+        "When complete, click on all words you stuttered on, or indicate that you did not stutter any words."
+      ],
+      "io": {
+        "microphone": false,
+        "webcam": false
+      }
+    },
+    {
+      "type": "GSE",
+      "number": 2,
+      "title": "Read Unsanitized Text Alone",
+      "GSEType": "base",
+      "text": [
+        "Read a book of your choosing aloud. You can choose any book you like, but it should be a book that you have not read before.",
+        "After you have read the book for 15 minutes (not yet actually enforced by the software) please take the survey."
+      ],
+      "io": {
+        "microphone": false,
+        "webcam": false
+      }
+    },
+    {
+      "type": "GSE",
+      "number": 3,
+      "title": "Read Sanitized Text with Audio Recording",
+      "text": [
+        "In this module, you will read a text passage out loud. It is generated with AI and does not contain any of the \"problematic\" words you selected.",
+        "When complete, click on all words you stuttered on, or indicate that you did not stutter any words.",
+        "Please turn on recording while you are reading and then hit stop when done. You do not need to listen to the recording aftwards but do know that it is there."
+      ],
+      "GSEType": "sanitize_text",
+      "io": {
+        "microphone": true,
+        "webcam": false
+      }
+    },
+    {
+      "type": "GSE",
+      "number": 4,
+      "title": "Talk with ChatGPT",
+      "GSEType": "chatgpt",
+      "text": [
+        "In this module, you will have a conversation with an AI chatbot. The chatbot will ask you questions and you will respond to them.",
+        "When complete, click on all words you stuttered on, or indicate that you did not stutter any words."
+      ],
+      "io": {
+        "microphone": true,
+        "webcam": false
+      }
+    },
+    {
+      "type": "GSE",
+      "number": 5,
+      "title": "Talk with ChatGPT Lite",
+      "GSEType": "chatgpt",
+      "lite": true,
+      "text": [
+        "In this module, you will have a conversation with an AI chatbot. The chatbot will ask you questions and you will respond to them.",
+        "When complete, click on all words you stuttered on, or indicate that you did not stutter any words."
+      ],
+      "io": {
+        "microphone": true,
+        "webcam": false
+      }
+    }
+  ]
+}

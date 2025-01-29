@@ -7,21 +7,45 @@ import { Card } from "@/components/ui/card";
 import { GSELayout } from "@/components/gse-layout";
 import { useAppState } from "../../contexts/AppStateContext";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function GSE1Page() {
   const { state } = useAppState();
-  const [isRecording, setIsRecording] = useState(false);
+  const [selectedInterest, setSelectedInterest] = useState<string>("");
+  const [generatedText, setGeneratedText] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const startWhisperRecording = () => {
-    setIsRecording(true);
-    // Add Whisper API integration logic here
-    console.log("Starting recording...");
-  };
+  const handleGenerate = async () => {
+    if (!selectedInterest) return;
 
-  const stopWhisperRecording = () => {
-    setIsRecording(false);
-    // Add logic to stop recording and process audio
-    console.log("Stopping recording...");
+    setIsLoading(true);
+    try {
+      const response = await fetch(
+        `/api/llm?interest=${encodeURIComponent(
+          selectedInterest
+        )}&badWords=${encodeURIComponent(
+          state.problemWords.join(",")
+        )}&storyTellerMode=casual`
+      );
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setGeneratedText(data.text);
+    } catch (error) {
+      console.error("Failed to generate text:", error);
+      // You might want to add error handling UI here
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -44,31 +68,44 @@ export default function GSE1Page() {
             ))}
           </div>
 
-          <h2 className="text-xl font-semibold mb-4">Your Interests</h2>
-          <div className="flex flex-wrap gap-2 mb-6">
-            {state.interests.map((interest) => (
-              <Badge key={interest} variant="secondary">
-                {interest}
-              </Badge>
-            ))}
+          <h2 className="text-xl font-semibold mb-4">Select an Interest</h2>
+          <div className="flex gap-4 mb-6">
+            <Select
+              value={selectedInterest}
+              onValueChange={setSelectedInterest}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Select a topic" />
+              </SelectTrigger>
+              <SelectContent>
+                {state.interests.map((interest) => (
+                  <SelectItem key={interest} value={interest}>
+                    {interest}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={handleGenerate}
+              disabled={!selectedInterest || isLoading}
+            >
+              {isLoading ? "Generating..." : "Generate"}
+            </Button>
           </div>
 
-          <p className="text-lg">
-            Click the microphone button and read this text aloud. The system
-            will analyze your pronunciation and provide feedback.
-          </p>
-        </div>
+          {generatedText && (
+            <div className="mt-6">
+              <h2 className="text-xl font-semibold mb-4">Read this text:</h2>
+              <p className="text-lg whitespace-pre-wrap">{generatedText}</p>
+            </div>
+          )}
 
-        <div className="mt-8 flex justify-center">
-          <Button
-            variant={isRecording ? "destructive" : "default"}
-            size="lg"
-            onClick={isRecording ? stopWhisperRecording : startWhisperRecording}
-            className="gap-2"
-          >
-            <Volume2 className="h-5 w-5" />
-            {isRecording ? "Stop Recording" : "Start Recording"}
-          </Button>
+          {!generatedText && (
+            <p className="text-lg">
+              Select an interest and click generate to get a text to read aloud.
+              The system will analyze your pronunciation and provide feedback.
+            </p>
+          )}
         </div>
       </Card>
     </GSELayout>
