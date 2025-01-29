@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useAppState } from "../contexts/AppStateContext";
+import { useAppState } from "../../contexts/AppStateContext";
 
 // Predefined interests that we suggest to users
 const SUGGESTED_INTERESTS = [
@@ -58,7 +58,7 @@ export default function InterestsPage() {
           asChild
           className="gap-2 text-gray-600 hover:text-gray-900"
         >
-          <Link href="/">
+          <Link href="/dashboard">
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>

@@ -12,7 +12,7 @@ export function GSELayout({ children }: { children: React.ReactNode }) {
           asChild
           className="gap-2 text-gray-600 hover:text-gray-900"
         >
-          <Link href="/">
+          <Link href="/dashboard">
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>

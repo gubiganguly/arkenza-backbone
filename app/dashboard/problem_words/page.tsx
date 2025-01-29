@@ -4,8 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import TextHighlighter from "../components/text-highlighter/TextHighlighter";
-import { useAppState } from "../contexts/AppStateContext";
+import TextHighlighter from "../../components/text-highlighter/TextHighlighter";
+import { useAppState } from "../../contexts/AppStateContext";
 import {
   Table,
   TableBody,

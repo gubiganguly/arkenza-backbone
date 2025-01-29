@@ -36,7 +36,7 @@ export function SlideDeck({ module }: SlideDeckProps) {
       {/* Back button */}
       <div className="absolute left-8 top-8">
         <Button variant="ghost" size="sm" asChild className="gap-2 text-gray-600 hover:text-gray-900">
-          <Link href="/">
+          <Link href="/dashboard">
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>

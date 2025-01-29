@@ -1,34 +1,47 @@
 "use client"
 
-import { User, LogOut } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { FIREBASE_AUTH } from "@/lib/firebase/config"
+import { useRouter } from "next/navigation"
 
 export function UserNav() {
+  const router = useRouter()
+  const user = FIREBASE_AUTH.currentUser
+
+  const handleLogout = async () => {
+    try {
+      await FIREBASE_AUTH.signOut()
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-12 w-12 rounded-full">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-            <User className="h-6 w-6 text-blue-600" />
-          </div>
-        </Button>
+        <Avatar className="h-8 w-8 cursor-pointer">
+          <AvatarFallback>
+            {user?.email?.charAt(0).toUpperCase() || 'U'}
+          </AvatarFallback>
+        </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end">
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
-        </DropdownMenuItem>
+        <DropdownMenuLabel>My Account</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
+        <DropdownMenuItem
+          className="cursor-pointer text-red-600 focus:text-red-600"
+          onClick={handleLogout}
+        >
+          Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

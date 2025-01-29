@@ -5,9 +5,9 @@ import { Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GSELayout } from "@/components/gse-layout";
-import { useAppState } from "../../contexts/AppStateContext";
+import { useAppState } from "../../../contexts/AppStateContext";
 import { Badge } from "@/components/ui/badge";
-import TextHighlighter from "../../components/text-highlighter/TextHighlighter";
+import TextHighlighter from "../../../components/text-highlighter/TextHighlighter";
 import {
   Select,
   SelectContent,
