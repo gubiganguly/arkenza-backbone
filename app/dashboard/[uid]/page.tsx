@@ -20,67 +20,70 @@ interface Module {
   href: string;
 }
 
-const modules: Module[] = [
-  {
-    id: 1,
-    name: "Introduction",
-    description: "Get started with the basics of the fluency program",
-    estimatedTime: 5,
-    isUnlocked: true,
-    isCompleted: true,
-    href: "/dashboard/introduction",
-  },
-  {
-    id: 2,
-    name: "Interests",
-    description: "Tell us about your interests!",
-    estimatedTime: 2,
-    isUnlocked: true,
-    isCompleted: true,
-    href: "/dashboard/interests",
-  },
-  {
-    id: 3,
-    name: "Collect Problematic Worlds",
-    description: "Identify words that are difficult for you to pronounce",
-    estimatedTime: 60,
-    isUnlocked: true,
-    isCompleted: false,
-    href: "/dashboard/problem_words",
-  },
-  {
-    id: 4,
-    name: "GSE 1",
-    description: "Read Sanitized Text Alone",
-    estimatedTime: 120,
-    isUnlocked: true,
-    isCompleted: false,
-    href: "/dashboard/gse/1",
-  },
-  {
-    id: 5,
-    name: "GSE 2",
-    description: "Intermediate speaking exercises focusing on fluency",
-    estimatedTime: 0,
-    isUnlocked: false,
-    isCompleted: false,
-    href: "/dashboard/gse/2",
-  },
-  {
-    id: 6,
-    name: "GSE 3",
-    description: "Advanced communication skills and complex topics",
-    estimatedTime: 0,
-    isUnlocked: false,
-    isCompleted: false,
-    href: "/dashboard/gse/3",
-  },
-];
-
 export default function UserDashboard({ params }: { params: { uid: string } }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const uid = params.uid;
+
+  const getModuleStatus = (moduleId: number) => {
+    if (!user || !user.modulesCompleted) {
+      return { isUnlocked: false, isCompleted: false };
+    }
+    const status = user.modulesCompleted.find(m => m.id === moduleId);
+    return status || { isUnlocked: false, isCompleted: false };
+  };
+
+  const modulesWithUid: Module[] = [
+    {
+      id: 1,
+      name: "Introduction",
+      description: "Get started with the basics of the fluency program",
+      estimatedTime: 5,
+      ...getModuleStatus(1),
+      href: `/dashboard/${uid}/introduction`,
+    },
+    {
+      id: 2,
+      name: "Interests",
+      description: "Tell us about your interests!",
+      estimatedTime: 2,
+      ...getModuleStatus(2),
+      href: `/dashboard/${uid}/interests`,
+    },
+    {
+      id: 3,
+      name: "Collect Problematic Worlds",
+      description: "Identify words that are difficult for you to pronounce",
+      estimatedTime: 60,
+      ...getModuleStatus(3),
+      href: `/dashboard/${uid}/problem-words`,
+    },
+    {
+      id: 4,
+      name: "GSE 1",
+      description: "Read Sanitized Text Alone",
+      estimatedTime: 120,
+      ...getModuleStatus(4),
+      href: `/dashboard/${uid}/gse/1`,
+    },
+    {
+      id: 5,
+      name: "GSE 2",
+      description: "Intermediate speaking exercises focusing on fluency",
+      estimatedTime: 0,
+      ...getModuleStatus(5),
+      href: `/dashboard/${uid}/gse/2`,
+    },
+    {
+      id: 6,
+      name: "GSE 3",
+      description: "Advanced communication skills and complex topics",
+      estimatedTime: 0,
+      ...getModuleStatus(6),
+      href: `/dashboard/${uid}/gse/3`,
+    },
+  ];
 
   useEffect(() => {
     const unsubscribe = FIREBASE_AUTH.onAuthStateChanged(async (authUser) => {
@@ -130,10 +133,10 @@ export default function UserDashboard({ params }: { params: { uid: string } }) {
         </div>
 
         <div className="space-y-6">
-          {modules.map((module) => (
+          {modulesWithUid.map((module) => (
             <Link
               key={module.id}
-              href={module.isUnlocked ? `${module.href}?uid=${params.uid}` : "#"}
+              href={module.isUnlocked ? module.href : "#"}
               className="block"
             >
               <Card

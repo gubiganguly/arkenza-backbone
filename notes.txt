@@ -1,18 +1,18 @@
 
 
 Todo
-- Setup Firebase database
-- Create user login pages
-- Setup login page with Google OAuth
-- implement user authentication in GSE
-- Add 
+
+- Fix module structure to include user status
 
 
 Progress:
 
-01/28/2025:
+01/29/2025:
 - Setup Codebase on my local machine
 - Re-organize codebase
 - Deployed to Vercel
 - Created table to display problem words
 - Added ability to select problem words in GSE 1
+- Implemented Firebase Auth
+- Integrated userid with dashboard
+-

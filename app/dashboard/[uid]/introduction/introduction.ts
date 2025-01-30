@@ -1,7 +1,7 @@
 import type { ModuleContent } from "@/types/slides"
 
 export const introductionModule: ModuleContent = {
-  id: "introduction",
+  id: "module1",
   title: "Introduction to Fluency",
   slides: [
     {
@@ -30,4 +30,3 @@ Start your journey to fluency with our proven methodology. This program is desig
     },
   ],
 }
-

@@ -1,10 +1,17 @@
+export interface ModuleStatus {
+  id: number;
+  isUnlocked: boolean;
+  isCompleted: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   problemWords: string[];
   interests: string[];
-  createdAt: Date;
+  modulesCompleted: ModuleStatus[];
+  createdAt: Date; 
   updatedAt: Date;
   // Add any additional user fields you need
 }

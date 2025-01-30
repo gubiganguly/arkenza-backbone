@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useAppState } from "../../contexts/AppStateContext";
+import { useRouter } from "next/navigation";
+import { userModel } from "@/lib/firebase/users/userModel";
+import { User } from "@/lib/firebase/users/userSchema";
 
 // Predefined interests that we suggest to users
 const SUGGESTED_INTERESTS = [
@@ -25,28 +27,84 @@ const SUGGESTED_INTERESTS = [
   "Politics",
 ];
 
-export default function InterestsPage() {
-  const { state, setInterests } = useAppState();
+export default function InterestsPage({ params }: { params: { uid: string } }) {
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [interests, setInterests] = useState<string[]>([]);
   const [newInterest, setNewInterest] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const userData = await userModel.getById(params.uid);
+      if (userData) {
+        setUser(userData);
+        setInterests(userData.interests);
+      }
+    };
+
+    loadUser();
+  }, [params.uid]);
 
   const addInterest = (interest: string) => {
     const trimmedInterest = interest.trim();
-    if (trimmedInterest && !state.interests.includes(trimmedInterest)) {
-      const newInterests = [...state.interests, trimmedInterest];
-      setInterests(newInterests);
+    if (trimmedInterest && !interests.includes(trimmedInterest)) {
+      setInterests(prev => [...prev, trimmedInterest]);
     }
     setNewInterest("");
   };
 
   const removeInterest = (interest: string) => {
-    const newInterests = state.interests.filter((i) => i !== interest);
-    setInterests(newInterests);
+    setInterests(prev => prev.filter(i => i !== interest));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     addInterest(newInterest);
   };
+
+  const handleFinish = async () => {
+    if (!user) return;
+
+    try {
+      setIsUpdating(true);
+
+      // Update interests
+      const currentModuleId = 2; // Interests module ID
+      const nextModuleId = currentModuleId + 1;
+
+      // Update the current module's status and unlock the next one
+      const updatedModules = user.modulesCompleted.map(module => {
+        if (module.id === currentModuleId) {
+          return { ...module, isCompleted: true };
+        }
+        if (module.id === nextModuleId) {
+          return { ...module, isUnlocked: true };
+        }
+        return module;
+      });
+
+      // Update both the interests and module status
+      await userModel.update(params.uid, {
+        interests: interests,
+        modulesCompleted: updatedModules
+      });
+
+      router.push(`/dashboard/${params.uid}`);
+    } catch (error) {
+      console.error('Error updating user:', error);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-blue-50 to-white p-8">
@@ -58,7 +116,7 @@ export default function InterestsPage() {
           asChild
           className="gap-2 text-gray-600 hover:text-gray-900"
         >
-          <Link href="/dashboard">
+          <Link href={`/dashboard/${params.uid}`}>
             <ArrowLeft className="h-4 w-4" />
             Back to Dashboard
           </Link>
@@ -77,12 +135,12 @@ export default function InterestsPage() {
           <div className="mb-6">
             <h2 className="mb-3 font-semibold">Your Selected Interests</h2>
             <div className="flex flex-wrap gap-2">
-              {state.interests.length === 0 ? (
+              {interests.length === 0 ? (
                 <p className="text-sm text-gray-500">
                   No interests selected yet. Add some below!
                 </p>
               ) : (
-                state.interests.map((interest) => (
+                interests.map((interest) => (
                   <Badge
                     key={interest}
                     variant="secondary"
@@ -123,7 +181,7 @@ export default function InterestsPage() {
             <h2 className="mb-3 font-semibold">Suggested Interests</h2>
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_INTERESTS.filter(
-                (interest) => !state.interests.includes(interest)
+                (interest) => !interests.includes(interest)
               ).map((interest) => (
                 <Badge
                   key={interest}
@@ -139,8 +197,12 @@ export default function InterestsPage() {
         </Card>
 
         <div className="text-center">
-          <Button asChild>
-            <Link href="/">Continue</Link>
+          <Button
+            onClick={handleFinish}
+            disabled={isUpdating}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            {isUpdating ? "Updating..." : "Finish"}
           </Button>
         </div>
       </div>

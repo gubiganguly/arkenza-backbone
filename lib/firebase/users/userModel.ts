@@ -11,10 +11,19 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { FIREBASE_DB } from '../config';
-import { User, CreateUserData, UpdateUserData } from './userSchema';
+import { User, CreateUserData, UpdateUserData, ModuleStatus } from './userSchema';
 
 const COLLECTION_NAME = 'users';
 const usersRef = collection(FIREBASE_DB, COLLECTION_NAME);
+
+const initialModuleStatuses: ModuleStatus[] = [
+  { id: 1, isUnlocked: true, isCompleted: false },  // Introduction
+  { id: 2, isUnlocked: false, isCompleted: false }, // Interests
+  { id: 3, isUnlocked: false, isCompleted: false }, // Problem Words
+  { id: 4, isUnlocked: false, isCompleted: false }, // GSE 1
+  { id: 5, isUnlocked: false, isCompleted: false }, // GSE 2
+  { id: 6, isUnlocked: false, isCompleted: false }  // GSE 3
+];
 
 export const userModel = {
   // Create a new user
@@ -24,6 +33,7 @@ export const userModel = {
     const user: User = {
       id: userId,
       ...userData,
+      modulesCompleted: userData.modulesCompleted || initialModuleStatuses,
       createdAt: new Date(),
       updatedAt: new Date()
     };
