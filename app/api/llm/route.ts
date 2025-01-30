@@ -1,24 +1,5 @@
 import OpenAI from "openai";
-import { encoding_for_model } from "tiktoken";
 import { NextResponse } from "next/server";
-
-const getBadTokens = (badWords: string[], model = "gpt-4o") => {
-  // @ts-expect-error - TikToken types are not up to date
-  const enc = encoding_for_model(model);
-
-  const captitalizeFirstLetter = (word: string) => {
-    return word.charAt(0).toUpperCase() + word.slice(1);
-  };
-
-  const addSpace = (word: string) => ` ${word}`;
-
-  let extendedBadWords = [...badWords, ...badWords.map(captitalizeFirstLetter)];
-  extendedBadWords = [...extendedBadWords, ...extendedBadWords.map(addSpace)];
-
-  const badTokens = extendedBadWords.map((word) => enc.encode(word)[0]);
-
-  return [...new Set(badTokens)].filter((token) => token === 0 || !!token);
-};
 
 const generateAbinito = async (
   topic: string,
@@ -52,19 +33,11 @@ The user will not be able to respond to your text, so do not attempt to make con
 `;
 
   if (badWords.length > 0) {
-    sys_prompt += `The user struggles saying certain words so you must avoid using the following words: ${badWordsString}. `;
+    sys_prompt += `
+The user struggles with pronouncing certain words, so you must completely avoid using the following words or any variations of them (including plurals, different tenses, or capitalizations): ${badWordsString}.
+
+This is very important for the user's learning experience. Double-check your response to ensure none of these words appear.`;
   }
-
-  const prompt = `The topic is ${topic}.`;
-
-  const badTokens = getBadTokens(badWords).slice(0, 300);
-  const logitBias = badTokens.reduce(
-    (acc: Record<number, number>, token: number) => {
-      acc[token] = -100;
-      return acc;
-    },
-    {}
-  );
 
   const chatCompletion = await openai.chat.completions.create({
     messages: [
@@ -74,11 +47,11 @@ The user will not be able to respond to your text, so do not attempt to make con
       },
       {
         role: "user",
-        content: prompt,
+        content: `Write about the topic: ${topic}`,
       },
     ],
-    model: "gpt-4o",
-    logit_bias: logitBias,
+    model: "gpt-4",
+    temperature: 0.7,
   });
 
   return chatCompletion.choices[0].message.content;
