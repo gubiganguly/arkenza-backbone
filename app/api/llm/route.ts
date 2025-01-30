@@ -1,6 +1,10 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
+// Add timeout configuration
+export const runtime = 'nodejs';
+export const maxDuration = 30; // This sets the timeout to 30 seconds
+
 const generateAbinito = async (
   topic: string,
   badWords: string[],
