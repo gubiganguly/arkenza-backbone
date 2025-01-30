@@ -33,7 +33,7 @@ export const userModel = {
     const user: User = {
       id: userId,
       ...userData,
-      modulesCompleted: userData.modulesCompleted || initialModuleStatuses,
+      modulesCompleted: initialModuleStatuses,
       createdAt: new Date(),
       updatedAt: new Date()
     };

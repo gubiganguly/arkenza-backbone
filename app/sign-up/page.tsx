@@ -16,6 +16,14 @@ export default function SignUp() {
   const router = useRouter();
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const initialModuleStatuses = [
+    { id: 1, isUnlocked: true, isCompleted: false },  // Introduction
+    { id: 2, isUnlocked: false, isCompleted: false }, // Interests
+    { id: 3, isUnlocked: false, isCompleted: false }, // Problem Words
+    { id: 4, isUnlocked: false, isCompleted: false }, // GSE 1
+    { id: 5, isUnlocked: false, isCompleted: false }, // GSE 2
+    { id: 6, isUnlocked: false, isCompleted: false }  // GSE 3
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +49,7 @@ export default function SignUp() {
         email,
         problemWords: [], // Initialize with empty array
         interests: [], // Initialize with empty array
-        modulesCompleted: [], // Initialize with empty array
+        modulesCompleted: initialModuleStatuses, // Initialize with empty array
       });
 
       router.push(`/dashboard/${userCredential.user.uid}`);
