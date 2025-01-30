@@ -41,6 +41,7 @@ export default function SignUp() {
         email,
         problemWords: [], // Initialize with empty array
         interests: [], // Initialize with empty array
+        modulesCompleted: [], // Initialize with empty array
       });
 
       router.push(`/dashboard/${userCredential.user.uid}`);
