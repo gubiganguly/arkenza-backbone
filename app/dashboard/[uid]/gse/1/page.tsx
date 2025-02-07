@@ -29,6 +29,12 @@ const EXERCISE_STEPS = [
   "Practice these words to improve your pronunciation"
 ];
 
+const TOOL_DESCRIPTIONS = {
+  reading: "Practice reading passages aloud to improve pronunciation",
+  speaking: "Focus on clear speech and proper word pronunciation",
+  learning: "Learn and track challenging words to enhance vocabulary"
+};
+
 export default function GSE1Page({ params }: { params: { uid: string } }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -271,7 +277,7 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
 
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-bold text-blue-950 dark:text-blue-100">GSE 1: Read Aloud</h1>
-        <p className="mt-2 text-gray-600 flex items-center justify-center gap-1">
+        <p className="mt-2 text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1">
           Practice reading text with clear pronunciation
           <button
             onClick={() => setShowMoreInfo(!showMoreInfo)}
@@ -280,6 +286,42 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
             More Info
           </button>
         </p>
+
+        <div className="flex justify-center gap-8 mt-4">
+          <div className="group relative">
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+              <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">Reading</span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
+              {TOOL_DESCRIPTIONS.reading}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+            </div>
+          </div>
+
+          <div className="group relative">
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+              <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">Speaking</span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
+              {TOOL_DESCRIPTIONS.speaking}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+            </div>
+          </div>
+
+          <div className="group relative">
+            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+              <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">Learning</span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
+              {TOOL_DESCRIPTIONS.learning}
+              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+            </div>
+          </div>
+        </div>
+
         {showMoreInfo && (
           <p className="mt-4 text-gray-600 dark:text-gray-400 text-sm max-w-2xl mx-auto">
             {HELP_TEXT}
