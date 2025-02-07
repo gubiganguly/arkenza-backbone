@@ -4,15 +4,21 @@ export interface ModuleStatus {
   isCompleted: boolean;
 }
 
+export interface Interest {
+  name: string;
+  subInterests: string[];
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   problemWords: string[];
-  interests: string[];
+  interests: Interest[];
   modulesCompleted: ModuleStatus[];
+  usedNonFrequentWords: string[];
   createdAt: Date; 
-  updatedAt: Date;
+  updatedAt: Date; 
   // Add any additional user fields you need
 }
 

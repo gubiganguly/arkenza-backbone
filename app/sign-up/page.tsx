@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FaEnvelope, FaLock, FaGoogle, FaUser } from 'react-icons/fa';
+import { FaEnvelope, FaLock, FaGoogle, FaUser, FaQuestionCircle } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -48,6 +48,7 @@ export default function SignUp() {
         name,
         email,
         problemWords: [], // Initialize with empty array
+        usedNonFrequentWords: [], // Initialize with empty array
         interests: [], // Initialize with empty array
         modulesCompleted: initialModuleStatuses, // Initialize with empty array
       });
@@ -82,7 +83,7 @@ export default function SignUp() {
           <div className="space-y-4">
             <div>
               <label htmlFor="name" className="sr-only">
-                Full Name
+                Username
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -95,9 +96,20 @@ export default function SignUp() {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
-                  placeholder="Full Name"
+                  className="block w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out"
+                  placeholder="Username"
                 />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <div className="group relative">
+                    <FaQuestionCircle className="h-5 w-5 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 cursor-help" />
+                    <div className="pointer-events-none absolute -top-2 right-0 w-48 transform translate-y-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                      <div className="bg-black dark:bg-gray-700 text-white text-xs rounded py-1 px-2 whitespace-normal">
+                        Please enter a non-identifiable username
+                      </div>
+                      <div className="absolute -top-1 right-4 w-2 h-2 bg-black dark:bg-gray-700 transform rotate-45"></div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
             

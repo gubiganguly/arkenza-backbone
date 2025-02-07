@@ -32,7 +32,7 @@ export const userModel = {
     
     const user: User = {
       id: userId,
-      ...userData,
+      ...userData, 
       modulesCompleted: initialModuleStatuses,
       createdAt: new Date(),
       updatedAt: new Date()
