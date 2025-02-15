@@ -17,6 +17,7 @@ export interface User {
   interests: Interest[];
   modulesCompleted: ModuleStatus[];
   usedNonFrequentWords: string[];
+  uniqueWordsEncountered: string[];
   createdAt: Date; 
   updatedAt: Date; 
   // Add any additional user fields you need

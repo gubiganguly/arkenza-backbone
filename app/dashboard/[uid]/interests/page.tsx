@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, X, Info } from "lucide-react";
+import { ArrowLeft, Plus, X, Info, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,18 +13,66 @@ import { User, Interest } from "@/lib/firebase/users/userSchema";
 
 // Predefined interests and sub-interests
 const PREDEFINED_INTERESTS: Record<string, string[]> = {
-  "Travel": ["Adventure", "Luxury", "Backpacking", "Cultural", "Food Tourism"],
-  "Business": ["Entrepreneurship", "Marketing", "Finance", "Management", "Startups"],
-  "Technology": ["AI", "Programming", "Gadgets", "Cybersecurity", "Web Development"],
-  "Sports": ["Football", "Basketball", "Tennis", "Swimming", "Yoga"],
-  "Music": ["Rock", "Classical", "Jazz", "Pop", "Electronic"],
-  "Movies": ["Action", "Drama", "Comedy", "Sci-Fi", "Documentary"],
-  "Food": ["Cooking", "Baking", "Restaurant", "Healthy Eating", "Wine"],
-  "Art": ["Painting", "Photography", "Sculpture", "Digital Art", "Design"],
-  "Literature": ["Fiction", "Non-Fiction", "Poetry", "Comics", "Journalism"],
-  "Science": ["Physics", "Biology", "Chemistry", "Astronomy", "Psychology"],
-  "History": ["Ancient", "Medieval", "Modern", "World War", "Art History"],
-  "Politics": ["International Relations", "Economics", "Social Issues", "Environment", "Law"]
+  "Travel": [
+    "Adventure", "Luxury", "Backpacking", "Cultural", "Food Tourism",
+    "Beach", "Mountain", "City Breaks", "Road Trips", "Historical Sites",
+    "Eco Tourism", "Photography"
+  ],
+  "Business": [
+    "Entrepreneurship", "Marketing", "Finance", "Management", "Startups",
+    "E-commerce", "Leadership", "Innovation", "Digital Business", "Investment",
+    "Business Strategy", "International Trade"
+  ],
+  "Technology": [
+    "AI", "Programming", "Gadgets", "Cybersecurity", "Web Development",
+    "Mobile Apps", "Cloud Computing", "Blockchain", "IoT", "Data Science",
+    "Machine Learning", "Virtual Reality"
+  ],
+  "Sports": [
+    "Football", "Basketball", "Tennis", "Swimming", "Yoga",
+    "Running", "Cycling", "Martial Arts", "Golf", "Volleyball",
+    "Fitness", "Winter Sports"
+  ],
+  "Music": [
+    "Rock", "Classical", "Jazz", "Pop", "Electronic",
+    "Hip Hop", "Country", "Blues", "Folk", "World Music",
+    "Opera", "Musical Theatre"
+  ],
+  "Movies": [
+    "Action", "Drama", "Comedy", "Sci-Fi", "Documentary",
+    "Horror", "Animation", "Thriller", "Romance", "Fantasy",
+    "Independent Films", "Foreign Cinema"
+  ],
+  "Food": [
+    "Cooking", "Baking", "Restaurant", "Healthy Eating", "Wine",
+    "International Cuisine", "Desserts", "Vegetarian", "BBQ", "Seafood",
+    "Food Photography", "Coffee & Tea"
+  ],
+  "Art": [
+    "Painting", "Photography", "Sculpture", "Digital Art", "Design",
+    "Drawing", "Street Art", "Ceramics", "Art History", "Installation Art",
+    "Printmaking", "Contemporary Art"
+  ],
+  "Literature": [
+    "Fiction", "Non-Fiction", "Poetry", "Comics", "Journalism",
+    "Classic Literature", "Contemporary", "Mystery", "Science Fiction",
+    "Biography", "Essays", "Literary Criticism"
+  ],
+  "Science": [
+    "Physics", "Biology", "Chemistry", "Astronomy", "Psychology",
+    "Neuroscience", "Environmental Science", "Genetics", "Space Exploration",
+    "Quantum Physics", "Marine Biology", "Climate Science"
+  ],
+  "History": [
+    "Ancient", "Medieval", "Modern", "World War", "Art History",
+    "Military History", "Social History", "Archaeological", "Cultural History",
+    "Economic History", "Political History", "Maritime History"
+  ],
+  "Politics": [
+    "International Relations", "Economics", "Social Issues", "Environment", "Law",
+    "Public Policy", "Political Theory", "Human Rights", "Democracy",
+    "Geopolitics", "Diplomacy", "Civil Rights"
+  ]
 };
 
 export default function InterestsPage({ params }: { params: { uid: string } }) {
@@ -33,6 +81,7 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
   const [interests, setInterests] = useState<Interest[]>([]);
   const [selectedInterest, setSelectedInterest] = useState<Interest | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -140,7 +189,7 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
   }
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-blue-50 to-white p-8">
+    <div className="relative min-h-screen bg-gradient-to-b from-blue-50 to-white p-6">
       {/* Back button */}
       <div className="absolute left-8 top-8">
         <Button
@@ -156,10 +205,10 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
         </Button>
       </div>
 
-      <div className="mx-auto max-w-2xl pt-16">
-        <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-blue-950">Your Interests</h1>
-          <p className="mt-2 text-gray-600 flex items-center justify-center gap-2">
+      <div className="mx-auto max-w-6xl pt-12">
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl font-bold text-blue-950">Your Interests</h1>
+          <p className="mt-1 text-gray-600 flex items-center justify-center gap-2">
             Select your interests and their specific sub-topics
             <span className="relative group">
               <Info className="h-4 w-4 text-gray-400 cursor-help" />
@@ -170,95 +219,118 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
           </p>
         </div>
 
-        <Card className="mb-8 p-6">
-          <div className="space-y-6">
-            <div>
-              <h2 className="mb-3 font-semibold">Available Interests</h2>
-              <div className="flex flex-wrap gap-2">
-                {Object.keys(PREDEFINED_INTERESTS).map((interest) => {
-                  const isSelected = interests.some(i => i.name === interest);
-                  return (
-                    <Badge
-                      key={interest}
-                      variant={isSelected ? "secondary" : "outline"}
-                      className={`cursor-pointer px-3 py-1.5 ${
-                        isSelected ? 'bg-blue-200' : 'hover:bg-gray-100'
-                      }`}
-                      onClick={() => {
-                        if (!isSelected) {
-                          addInterest(interest);
+        <div className="grid grid-cols-12 gap-6">
+          {/* Left side - Main interests */}
+          <Card className="col-span-7 p-5 h-[500px] overflow-y-auto">
+            <h2 className="font-semibold mb-4">Select Your Interests</h2>
+            <div className="flex flex-col gap-2">
+              {Object.keys(PREDEFINED_INTERESTS).map((interest) => {
+                const isSelected = interests.some(i => i.name === interest);
+                return (
+                  <div
+                    key={interest}
+                    onClick={() => {
+                      const existingInterest = interests.find(i => i.name === interest);
+                      if (existingInterest) {
+                        setSelectedInterest(existingInterest);
+                      } else {
+                        setSelectedInterest({ name: interest, subInterests: [] });
+                      }
+                    }}
+                    className={`
+                      p-3 rounded-lg cursor-pointer transition-all duration-200
+                      ${selectedInterest?.name === interest ? 'bg-gray-50' : 'bg-white hover:bg-gray-50'}
+                      ${selectedInterest?.name === interest ? 'ring-2 ring-blue-400' : ''}
+                      border flex items-center gap-3
+                    `}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isSelected) {
+                          removeInterest(interest);
                         } else {
-                          const existingInterest = interests.find(i => i.name === interest);
-                          if (existingInterest) {
-                            setSelectedInterest(existingInterest);
-                          }
+                          addInterest(interest);
                         }
                       }}
+                      className={`
+                        w-5 h-5 rounded border flex items-center justify-center
+                        transition-colors duration-200
+                        ${isSelected ? 
+                          'bg-blue-500 border-blue-500 text-white' : 
+                          'border-gray-300 hover:border-blue-500'
+                        }
+                      `}
                     >
-                      {interest}
-                      {isSelected && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeInterest(interest);
-                          }}
-                          className="ml-1 rounded-full p-0.5 hover:bg-gray-200"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      )}
-                    </Badge>
-                  );
-                })}
-              </div>
+                      {isSelected && <Check className="h-3 w-3" />}
+                    </button>
+                    <span className="font-medium flex-grow">{interest}</span>
+                  </div>
+                );
+              })}
             </div>
+          </Card>
 
-            {interests.map((interest) => (
-              <div key={interest.name} className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-semibold mb-3">Sub-interests for {interest.name}</h3>
-                <div className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {interest.subInterests.map((subInterest) => (
+          {/* Right side - Sub-interests */}
+          <Card className="col-span-5 p-5 h-[500px] overflow-y-auto">
+            {selectedInterest ? (
+              <div className="h-full">
+                <h2 className="font-semibold mb-4">
+                  Sub-interests for {selectedInterest.name}
+                </h2>
+                {errorMessage && (
+                  <p className="text-red-500 text-sm mb-3">
+                    {errorMessage}
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {PREDEFINED_INTERESTS[selectedInterest.name].map((sub) => {
+                    const currentInterest = interests.find(i => i.name === selectedInterest.name);
+                    const isSelected = currentInterest?.subInterests.includes(sub) || false;
+                    
+                    return (
                       <Badge
-                        key={subInterest}
-                        variant="secondary"
-                        className="gap-1 px-2 py-1"
-                      >
-                        {subInterest}
-                        <button
-                          onClick={() => removeSubInterest(interest, subInterest)}
-                          className="ml-1 rounded-full p-0.5 hover:bg-gray-200"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
-                  </div>
+                        key={sub}
+                        variant={isSelected ? "secondary" : "outline"}
+                        className={`
+                          cursor-pointer transition-all duration-200 px-2 py-1
+                          flex items-center justify-center text-center
+                          ${isSelected ? 
+                            'bg-blue-100 hover:bg-blue-200 border-blue-200' : 
+                            'hover:bg-gray-100'
+                          }
+                        `}
+                        onClick={() => {
+                          if (!interests.some(i => i.name === selectedInterest.name)) {
+                            setErrorMessage(`Please select "${selectedInterest.name}" first before choosing sub-interests.`);
+                            setTimeout(() => setErrorMessage(null), 3000);
+                            return;
+                          }
+                          setErrorMessage(null);
 
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Available sub-interests:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {PREDEFINED_INTERESTS[interest.name]
-                        .filter(sub => !interest.subInterests.includes(sub))
-                        .map((sub) => (
-                          <Badge
-                            key={sub}
-                            variant="outline"
-                            className="cursor-pointer hover:bg-gray-100"
-                            onClick={() => addSubInterest(interest, sub)}
-                          >
-                            {sub}
-                          </Badge>
-                        ))}
-                    </div>
-                  </div>
+                          // Toggle the sub-interest
+                          if (isSelected) {
+                            removeSubInterest(currentInterest!, sub);
+                          } else {
+                            addSubInterest(currentInterest!, sub);
+                          }
+                        }}
+                      >
+                        {sub}
+                      </Badge>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
-          </div>
-        </Card>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-500">
+                <p>Select an interest from the left to manage sub-interests</p>
+              </div>
+            )}
+          </Card>
+        </div>
 
-        <div className="text-center">
+        <div className="text-center mt-4">
           <Button
             onClick={handleFinish}
             disabled={isUpdating}

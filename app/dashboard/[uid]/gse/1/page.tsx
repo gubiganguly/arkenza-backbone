@@ -4,12 +4,11 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GSELayout } from "@/components/gse-layout";
-import { Badge } from "@/components/ui/badge";
 import TextHighlighter from "@/app/components/text-highlighter/TextHighlighter";
 import { userModel } from "@/lib/firebase/users/userModel";
 import { User } from "@/lib/firebase/users/userSchema";
 import { useRouter } from "next/navigation";
-import { RotateCcw, RefreshCw, BookOpen, Mic, Brain, ArrowRight } from "lucide-react";
+import { RefreshCw, BookOpen, Mic, Brain, ArrowRight, Heart, Scale, Info } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -17,36 +16,116 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SlideDeckModal } from "@/components/slide-deck-modal";
 
-const HELP_TEXT = `Please take some time to read through a few passages and identify words that you may have trouble pronouncing. You can generate new passages and select words in that passage to take note of which words are causing you problems. Once you are done, click the Finish button to save your problem words.`;
+const HELP_TEXT = `Please take some time to recite a few passages and identify words that you may have trouble pronouncing. You can generate new passages and select words in that passage to take note of which words are causing you problems. Once you are done, click the Finish button to save your problem words.`;
 
-const INTRO_TEXT = `In this exercise, you'll practice reading passages out loud while identifying words that are challenging to pronounce. This will help improve your pronunciation skills and build confidence in speaking English.`;
+const INTRO_TEXT = `In this exercise, you'll practice reciting passages out loud while identifying words that are challenging to pronounce. This will help improve your pronunciation skills and build confidence in speaking English.`;
 
 const EXERCISE_STEPS = [
-  "Generate passages about topics that interest you",
-  "Read the passages out loud",
-  "Click on words that are difficult to pronounce",
-  "Practice these words to improve your pronunciation"
+  "Make sure you are in a place where no one can hear you",
+  "Choose topics you would like to recite and generate the text passages",
+  "Recite the text passages aloud",
+  "If you hear anyone approaching, stop speaking until they are gone",
+  "Add any newly discovered problematic words to your list",
+  "When ready, click the 'next' button to proceed"
 ];
 
 const TOOL_DESCRIPTIONS = {
-  reading: "Practice reading passages aloud to improve pronunciation",
+  reading: "Practice reciting passages aloud to improve pronunciation",
   speaking: "Focus on clear speech and proper word pronunciation",
   learning: "Learn and track challenging words to enhance vocabulary"
 };
 
+const INTRO_SLIDES = [
+  {
+    title: "Welcome to GSE 1",
+    content: "Welcome to your first Graduated Speaking Exercise (GSE)! This is the beginning of your journey to improved fluency. In this GSE, you will recite text passages in complete privacy, with absolutely no monitoring or recording. This is your safe space to practice.",
+    icon: <BookOpen className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  },
+  {
+    title: "Complete Privacy Guaranteed",
+    content: "You will recite these passages when you are completely alone. Nobody is listening - not even your computer. For maximum privacy, you can even print out the text passages and turn off your computer before reciting them. This exercise is designed to be completely private, with no recording or monitoring of any kind.",
+    icon: <Mic className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  },
+  {
+    title: "AI-Powered Practice",
+    content: "The text passages are written by artificial intelligence (ChatGPT), customized to your interests. Simply choose the topics you'd like to recite about, and ChatGPT will generate personalized passages. What's more impressive is that it will automatically avoid using any words you've identified as problematic, making your practice more effective and comfortable.",
+    icon: <Brain className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  },
+  {
+    title: "Future Progression",
+    content: "While later exercises will include speech fluency measurements to help guide your progress, this first GSE is completely monitoring-free. We want you to start this journey in a conversation where nothing, not even silicon, is listening to or processing your speech. This creates the most comfortable environment for practice.",
+    icon: <Heart className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  },
+  {
+    title: "Self-Assessment Matters",
+    content: "Remember, experiencing a few disfluencies while reciting doesn't automatically mean you should judge yourself as 'disfluent'. What truly matters is how YOU feel about your speech and fluency. You might have some disfluencies but feel perfectly fluent - that's fine to move forward. Or you might speak perfectly but feel unsure - that's a sign to spend more time here. Trust your judgment.",
+    icon: <Scale className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  }
+];
+
+const FINAL_SLIDE = {
+  title: "GSE 1: Recite Aloud",
+  description: "Practice reciting passages out loud while identifying words that are challenging to pronounce. This will help improve your pronunciation skills and build confidence in speaking English.",
+  duration: "120-240",
+  deviceSettings: [
+    {
+      column1: [
+        { label: "My Mic", enabled: false },
+        { label: "Speech to Text", enabled: false },
+        { label: "AI Generated Text", enabled: true }
+      ],
+      column2: [
+        { label: "Video Camera", enabled: false },
+        { label: "Fluency Monitor", enabled: false },
+        { label: "Virtual Reality", enabled: false }
+      ]
+    }
+  ],
+  tools: [
+    {
+      icon: <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Reciting",
+      description: "Practice with AI-generated passages tailored to your interests"
+    },
+    {
+      icon: <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Privacy",
+      description: "Complete privacy with no recording or monitoring of any kind"
+    },
+    {
+      icon: <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Progress",
+      description: "Self-paced practice with the ability to track challenging words"
+    }
+  ]
+};
+
+// Add interface for API response
+interface GenerateTextResponse {
+  text: string;
+  totalWordCount: number;
+  newUniqueWords: string[];
+  newUniqueWordCount: number;
+  success: boolean;
+}
+
 export default function GSE1Page({ params }: { params: { uid: string } }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [problemWords, setProblemWords] = useState<string[]>([]);
   const [selectedInterest, setSelectedInterest] = useState<string>("");
   const [generatedText, setGeneratedText] = useState<string>("Click generate to create a new passage.");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isClearing, setIsClearing] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showIntroModal, setShowIntroModal] = useState(true);
+
+  // Add new state variables for words and statistics
+  const [problemWords, setProblemWords] = useState<string[]>([]);
+  const [totalWordCount, setTotalWordCount] = useState<number>(0);
+  const [newUniqueWords, setNewUniqueWords] = useState<string[]>([]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -66,22 +145,27 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
     }
   }, [user?.interests, selectedInterest]);
 
-  const handleClearNonFrequentWords = async () => {
-    if (!user) return;
+  // Add word management functions
+  const addBadWord = (word: string) => {
+    if (!problemWords.includes(word)) {
+      setProblemWords(prev => [...prev, word]);
+    }
+  };
 
+  const removeBadWord = (word: string) => {
+    setProblemWords(prev => prev.filter(w => w !== word));
+  };
+
+  // Add function to save problem words
+  const saveUserProblemWords = async () => {
+    if (!user || !problemWords) return;
+    
     try {
-      setIsClearing(true);
       await userModel.update(params.uid, {
-        usedNonFrequentWords: []
+        problemWords: problemWords
       });
-      setUser(prev => prev ? {
-        ...prev,
-        usedNonFrequentWords: []
-      } : null);
     } catch (error) {
-      console.error('Error clearing non-frequent words:', error);
-    } finally {
-      setIsClearing(false);
+      console.error('Error saving problem words:', error);
     }
   };
 
@@ -95,72 +179,61 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       setIsGenerating(true);
       setError(null);
 
+      // Save current problem words before generating new passage
+      await saveUserProblemWords();
+
       const interestObj = user?.interests.find(i => i.name === selectedInterest);
       if (!interestObj) {
         throw new Error('Selected interest not found');
       }
 
-      const response = await fetch(`/api/llm?` + new URLSearchParams({
-        interest: selectedInterest,
-        subInterests: interestObj.subInterests.join(','),
-        userId: params.uid,
-        storyTellerMode: "casual"
-      }));
+      // Generate new passage with updated API parameters
+      const response = await fetch('/api/llm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          interest: selectedInterest,
+          subInterests: interestObj.subInterests,
+          userId: params.uid,
+          problemWords,
+          hideProblemWords: true,
+          emphasizeProblemWords: false
+        })
+      });
 
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to generate text');
       }
 
-      const data = await response.json();
-      setGeneratedText(data.text);
+      const data: GenerateTextResponse = await response.json();
+      
+      if (data.text === "Not able to generate a passage with the selected problem words") {
+        setError("Could not generate text avoiding all problem words. Try removing some problem words.");
+        return;
+      }
 
-      // Update local state with new non-frequent words
-      if (data.newWords && user) {
+      // Update state with new text and statistics
+      setGeneratedText(data.text);
+      setTotalWordCount(data.totalWordCount);
+      setNewUniqueWords(data.newUniqueWords);
+
+      // Update local user state with new unique words
+      if (data.newUniqueWords.length > 0 && user) {
+        const updatedUniqueWords = [...(user.uniqueWordsEncountered || []), ...data.newUniqueWords];
         setUser(prev => prev ? {
           ...prev,
-          usedNonFrequentWords: [...(prev.usedNonFrequentWords || []), ...data.newWords]
+          uniqueWordsEncountered: updatedUniqueWords
         } : null);
       }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate text');
       console.error('Error generating text:', err);
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const addBadWord = async (word: string) => {
-    if (!user || problemWords.includes(word)) return;
-
-    const newProblemWords = [...problemWords, word];
-    setProblemWords(newProblemWords);
-
-    try {
-      await userModel.update(params.uid, {
-        problemWords: newProblemWords
-      });
-    } catch (error) {
-      console.error('Error updating problem words:', error);
-      // Revert the state if the update fails
-      setProblemWords(problemWords);
-    }
-  };
-
-  const removeBadWord = async (word: string) => {
-    if (!user) return;
-
-    const newProblemWords = problemWords.filter(w => w !== word);
-    setProblemWords(newProblemWords);
-
-    try {
-      await userModel.update(params.uid, {
-        problemWords: newProblemWords
-      });
-    } catch (error) {
-      console.error('Error updating problem words:', error);
-      // Revert the state if the update fails
-      setProblemWords(problemWords);
     }
   };
 
@@ -170,10 +243,12 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
     try {
       setIsUpdating(true);
 
+      // Save problem words before completing the module
+      await saveUserProblemWords();
+
       const currentModuleId = 4; // GSE 1 module ID
       const nextModuleId = currentModuleId + 1;
 
-      // Update the current module's status and unlock the next one
       const updatedModules = user.modulesCompleted.map(module => {
         if (module.id === currentModuleId) {
           return { ...module, isCompleted: true };
@@ -206,221 +281,142 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
 
   return (
     <GSELayout>
-      {/* Intro Modal */}
-      {showIntroModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-lg max-w-[525px] w-full p-6 shadow-xl">
-            {/* Modal Header */}
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-blue-950 dark:text-blue-100">
-                GSE 1: Read Aloud Exercise
-              </h2>
-              <p className="mt-4 text-gray-600 dark:text-gray-400">
-                {INTRO_TEXT}
-              </p>
-            </div>
-
-            {/* Exercise Steps */}
-            <div className="mt-6 space-y-4">
-              {EXERCISE_STEPS.map((step, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                    <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-                      {index + 1}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 text-left">
-                    {step}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* Tools Section */}
-            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-800">
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 text-center">
-                Tools you'll be using:
-              </p>
-              <div className="flex justify-center gap-6">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                    <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Reading</span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                    <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Speaking</span>
-                </div>
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                    <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">Learning</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Begin Button */}
-            <Button
-              onClick={() => setShowIntroModal(false)}
-              className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-            >
-              Begin Exercise
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <SlideDeckModal
+        isOpen={showIntroModal}
+        onClose={() => setShowIntroModal(false)}
+        slides={INTRO_SLIDES}
+        finalSlide={FINAL_SLIDE}
+      />
 
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-blue-950 dark:text-blue-100">GSE 1: Read Aloud</h1>
+        <h1 className="text-3xl font-bold text-blue-950 dark:text-blue-100">GSE 1: Recite Aloud</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1">
-          Practice reading text with clear pronunciation
+          Practice reciting text with clear pronunciation
           <button
             onClick={() => setShowMoreInfo(!showMoreInfo)}
-            className="ml-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline text-sm font-medium"
+            className="ml-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline text-sm font-medium inline-flex items-center"
           >
             More Info
+            {showMoreInfo ? (
+              <ArrowRight className="h-4 w-4 ml-1 transform rotate-90 transition-transform" />
+            ) : (
+              <ArrowRight className="h-4 w-4 ml-1 transition-transform" />
+            )}
           </button>
         </p>
-
-        <div className="flex justify-center gap-8 mt-4">
-          <div className="group relative">
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-              <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">Reading</span>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
-              {TOOL_DESCRIPTIONS.reading}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-            </div>
-          </div>
-
-          <div className="group relative">
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-              <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">Speaking</span>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
-              {TOOL_DESCRIPTIONS.speaking}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-            </div>
-          </div>
-
-          <div className="group relative">
-            <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-              <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400 mt-1 block">Learning</span>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg">
-              {TOOL_DESCRIPTIONS.learning}
-              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-            </div>
-          </div>
-        </div>
-
+        
         {showMoreInfo && (
-          <p className="mt-4 text-gray-600 dark:text-gray-400 text-sm max-w-2xl mx-auto">
-            {HELP_TEXT}
-          </p>
+          <div className="mt-4 max-w-2xl mx-auto animate-fadeIn">
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6 text-left">
+              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-gray-100">About This Exercise</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">{INTRO_TEXT}</p>
+              <h4 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">How it works:</h4>
+              <ul className="list-disc pl-5 text-gray-600 dark:text-gray-400 space-y-2">
+                {EXERCISE_STEPS.map((step, index) => (
+                  <li key={index}>{step}</li>
+                ))}
+              </ul>
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h4 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Tools Available:</h4>
+                <ul className="space-y-2">
+                  {Object.entries(TOOL_DESCRIPTIONS).map(([key, description]) => (
+                    <li key={key} className="flex items-start gap-2">
+                      <span className="text-blue-600 dark:text-blue-400">•</span>
+                      <span className="text-gray-600 dark:text-gray-400">{description}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
       <Card className="relative mb-8 p-8">
         <div className="prose mx-auto max-w-none">
-          <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-between">
-            <div className="text-gray-600 dark:text-gray-400">
-              <span className="font-medium">Non-Frequent Words Used: </span>
-              <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                {user?.usedNonFrequentWords?.length || 0}
-              </span>
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
+              <div className="w-full md:w-[300px]">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                    Select an interest
+                  </p>
+                  <div className="group relative">
+                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 cursor-help" />
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
+                      Please select one of your interests. This interest will be used to generate the text passage below
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                    </div>
+                  </div>
+                </div>
+                <Select
+                  value={selectedInterest}
+                  onValueChange={setSelectedInterest}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Choose a topic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {user?.interests?.map((interest) => (
+                      <SelectItem key={interest.name} value={interest.name}>
+                        {interest.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                onClick={generateNewPassage}
+                disabled={isGenerating || !selectedInterest}
+                className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 w-full md:w-auto"
+              >
+                {isGenerating ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Generate New Passage
+                  </>
+                )}
+              </Button>
             </div>
-            <Button
-              onClick={handleClearNonFrequentWords}
-              disabled={isClearing}
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              {isClearing ? (
-                <>
-                  <RotateCcw className="h-4 w-4 animate-spin" />
-                  Clearing...
-                </>
-              ) : (
-                <>
-                  <RotateCcw className="h-4 w-4" />
-                  Clear List
-                </>
-              )}
-            </Button>
-          </div>
 
-          <h2 className="text-xl font-semibold mb-4">Your Problem Words</h2>
-          <div className="flex flex-wrap gap-2 mb-6">
-            {problemWords.map((word) => (
-              <Badge key={word} variant="secondary">
-                {word}
-              </Badge>
-            ))}
-          </div>
-
-          <p className="text-gray-600 dark:text-gray-400 mb-2">
-            Please select an interest you would like to generate a passage about
-          </p>
-          
-          <div className="w-full max-w-xs mb-6">
-            <Select
-              value={selectedInterest}
-              onValueChange={setSelectedInterest}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select an interest" />
-              </SelectTrigger>
-              <SelectContent>
-                {user?.interests?.map((interest) => (
-                  <SelectItem key={interest.name} value={interest.name}>
-                    {interest.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <TextHighlighter
-            text={generatedText}
-            highlightedWords={problemWords}
-            addBadWord={addBadWord}
-            removeBadWord={removeBadWord}
-          />
-          
-          <div className="mt-4 flex flex-col items-center gap-2">
-            <Button
-              onClick={generateNewPassage}
-              disabled={isGenerating || !selectedInterest}
-              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-            >
-              {isGenerating ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4" />
-                  Generate New Passage
-                </>
-              )}
-            </Button>
-            
             {error && (
               <p className="text-sm text-red-500 dark:text-red-400">
                 {error}
               </p>
             )}
+
+            <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6">
+              <TextHighlighter
+                text={generatedText}
+                highlightedWords={problemWords}
+                addBadWord={addBadWord}
+                removeBadWord={removeBadWord}
+              />
+
+              {/* Word Statistics */}
+              {totalWordCount > 0 && (
+                <div className="flex items-center justify-end gap-6 text-sm mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Total Words: </span>
+                    <span className="text-blue-600 dark:text-blue-400">{totalWordCount}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">New Unique Words: </span>
+                    <span className="text-blue-600 dark:text-blue-400">{newUniqueWords.length}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Total Unique Words Encountered: </span>
+                    <span className="text-blue-600 dark:text-blue-400">{user?.uniqueWordsEncountered?.length || 0}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Card>

@@ -49,6 +49,7 @@ export default function SignUp() {
         email,
         problemWords: [], // Initialize with empty array
         usedNonFrequentWords: [], // Initialize with empty array
+        uniqueWordsEncountered: [], // Initialize with empty array
         interests: [], // Initialize with empty array
         modulesCompleted: initialModuleStatuses, // Initialize with empty array
       });

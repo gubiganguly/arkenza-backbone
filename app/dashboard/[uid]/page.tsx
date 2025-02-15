@@ -62,7 +62,7 @@ export default function UserDashboard({ params }: { params: { uid: string } }) {
     {
       id: 4,
       name: "GSE 1",
-      description: "Read Sanitized Text Alone",
+      description: "Recite Sanitized Text Alone",
       estimatedTime: 120,
       ...getModuleStatus(4),
       href: `/dashboard/${uid}/gse/1`,

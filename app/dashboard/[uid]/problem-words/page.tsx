@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, Check, RefreshCw, RotateCcw } from "lucide-react";
+import { ArrowLeft, Trash2, Check, RefreshCw, RotateCcw, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TextHighlighter from "@/app/components/text-highlighter/TextHighlighter";
 import { useRouter } from "next/navigation";
 import { userModel } from "@/lib/firebase/users/userModel";
 import { User } from "@/lib/firebase/users/userSchema";
-import { Info } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -25,6 +24,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Add these interfaces for API response types
+interface GenerateTextResponse {
+  text: string;
+  totalWordCount: number;
+  newUniqueWords: string[];
+  newUniqueWordCount: number;
+  success: boolean;
+}
+
 export default function ProblemWords({ params }: { params: { uid: string } }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -36,6 +44,17 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
   const [selectedInterest, setSelectedInterest] = useState<string>("");
   const [isClearing, setIsClearing] = useState(false);
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+
+  // Add new state variables for word statistics
+  const [totalWordCount, setTotalWordCount] = useState<number>(0);
+  const [newUniqueWords, setNewUniqueWords] = useState<string[]>([]);
+
+  // Add new state for clearing unique words list
+  const [isClearingUniqueWords, setIsClearingUniqueWords] = useState(false);
+
+  // Add new state for word usage preferences
+  const [hideProblemWords, setHideProblemWords] = useState(true);
+  const [emphasizeProblemWords, setEmphasizeProblemWords] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -138,28 +157,55 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
         throw new Error('Selected interest not found');
       }
 
-      const response = await fetch(`/api/llm?` + new URLSearchParams({
-        interest: selectedInterest,
-        subInterests: interestObj.subInterests.join(','),
-        userId: params.uid,
-        storyTellerMode: "casual"
-      }));
+      // Save current problem words before generating new passage
+      if (problemWords.length > 0 && user) {
+        await userModel.update(params.uid, {
+          problemWords: problemWords
+        });
+      }
+
+      // Generate new passage with updated API parameters
+      const response = await fetch('/api/llm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          interest: selectedInterest,
+          subInterests: interestObj.subInterests,
+          userId: params.uid,
+          problemWords,
+          hideProblemWords,
+          emphasizeProblemWords
+        })
+      });
 
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || 'Failed to generate text');
       }
 
-      const data = await response.json();
-      setText(data.text);
+      const data: GenerateTextResponse = await response.json();
+      
+      if (data.text === "Not able to generate a passage with the selected problem words") {
+        setError("Could not generate text avoiding all problem words. Try removing some problem words.");
+        return;
+      }
 
-      // Update local state with new non-frequent words
-      if (data.newWords && user) {
+      // Update state with new text and statistics
+      setText(data.text);
+      setTotalWordCount(data.totalWordCount);
+      setNewUniqueWords(data.newUniqueWords);
+
+      // Update local user state with new unique words
+      if (data.newUniqueWords.length > 0 && user) {
+        const updatedUniqueWords = [...(user.uniqueWordsEncountered || []), ...data.newUniqueWords];
         setUser(prev => prev ? {
           ...prev,
-          usedNonFrequentWords: [...(prev.usedNonFrequentWords || []), ...data.newWords]
+          uniqueWordsEncountered: updatedUniqueWords
         } : null);
       }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate text');
       console.error('Error generating text:', err);
@@ -167,6 +213,62 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
       setIsGenerating(false);
     }
   };
+
+  // Add function to clear unique words
+  const handleClearUniqueWords = async () => {
+    if (!user) return;
+
+    try {
+      setIsClearingUniqueWords(true);
+      await userModel.update(params.uid, {
+        uniqueWordsEncountered: []
+      });
+
+      // Update local state
+      setUser(prev => prev ? {
+        ...prev,
+        uniqueWordsEncountered: []
+      } : null);
+    } catch (error) {
+      console.error('Error clearing unique words:', error);
+    } finally {
+      setIsClearingUniqueWords(false);
+    }
+  };
+
+  // Add this just before the interest selector in the JSX
+  const wordUsageControls = (
+    <div className="flex items-center gap-4 mb-4">
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={hideProblemWords}
+          onChange={(e) => {
+            setHideProblemWords(e.target.checked);
+            if (e.target.checked) {
+              setEmphasizeProblemWords(false);
+            }
+          }}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+        <span className="text-sm text-gray-600 dark:text-gray-400">Hide Problem Words</span>
+      </label>
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={emphasizeProblemWords}
+          onChange={(e) => {
+            setEmphasizeProblemWords(e.target.checked);
+            if (e.target.checked) {
+              setHideProblemWords(false);
+            }
+          }}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+        <span className="text-sm text-gray-600 dark:text-gray-400">Practice Problem Words</span>
+      </label>
+    </div>
+  );
 
   if (!user) {
     return (
@@ -213,61 +315,88 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Text Highlighter Section */}
+          {/* Text generation section */}
           <div className="bg-white dark:bg-gray-900 rounded-lg p-6 shadow-sm">
-            <p className="text-gray-600 dark:text-gray-400 mb-2">
-              Please select an interest you would like to generate a passage about
-            </p>
-            
-            <div className="w-full max-w-xs mb-6">
-              <Select
-                value={selectedInterest}
-                onValueChange={setSelectedInterest}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select an interest" />
-                </SelectTrigger>
-                <SelectContent>
-                  {user?.interests?.map((interest) => (
-                    <SelectItem key={interest.name} value={interest.name}>
-                      {interest.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <div className="flex flex-col gap-6">
+              {wordUsageControls}
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
+                <div className="w-full md:w-[300px]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      Select an interest
+                    </p>
+                    <div className="group relative">
+                      <Info className="h-4 w-4 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 cursor-help" />
+                      <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
+                        Please select one of your interests. This interest will be used to generate the text passage below
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <Select
+                    value={selectedInterest}
+                    onValueChange={setSelectedInterest}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Choose a topic" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {user?.interests?.map((interest) => (
+                        <SelectItem key={interest.name} value={interest.name}>
+                          {interest.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <TextHighlighter
-              text={text}
-              highlightedWords={problemWords}
-              addBadWord={addBadWord}
-              removeBadWord={removeBadWord}
-            />
-            
-            {/* Generate Button */}
-            <div className="mt-4 flex flex-col items-center gap-2">
-              <Button
-                onClick={generateNewPassage}
-                disabled={isGenerating || !selectedInterest}
-                className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-              >
-                {isGenerating ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4" />
-                    Generate New Passage
-                  </>
-                )}
-              </Button>
-              
+                <Button
+                  onClick={generateNewPassage}
+                  disabled={isGenerating || !selectedInterest}
+                  className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 w-full md:w-auto"
+                >
+                  {isGenerating ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4" />
+                      Generate New Passage
+                    </>
+                  )}
+                </Button>
+              </div>
+
               {error && (
                 <p className="text-sm text-red-500 dark:text-red-400">
                   {error}
                 </p>
+              )}
+
+              {/* Text passage */}
+              <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6">
+                <TextHighlighter
+                  text={text}
+                  highlightedWords={problemWords}
+                  addBadWord={addBadWord}
+                  removeBadWord={removeBadWord}
+                />
+              </div>
+
+              {/* Word Statistics moved to bottom */}
+              {totalWordCount > 0 && (
+                <div className="flex items-center justify-end gap-6 text-sm">
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Total Words: </span>
+                    <span className="text-blue-600 dark:text-blue-400">{totalWordCount}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">New Unique Words: </span>
+                    <span className="text-blue-600 dark:text-blue-400">{newUniqueWords.length}</span>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -279,21 +408,22 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
               <p className="text-sm text-gray-600 dark:text-gray-400">Click the trash icon to remove a word</p>
             </div>
 
+            {/* Add Unique Words Stats */}
             <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg flex items-center justify-between">
               <div className="text-gray-600 dark:text-gray-400">
-                <span className="font-medium">Non-Frequent Words Used: </span>
+                <span className="font-medium">Total Unique Words Encountered: </span>
                 <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                  {user?.usedNonFrequentWords?.length || 0}
+                  {user?.uniqueWordsEncountered?.length || 0}
                 </span>
               </div>
               <Button
-                onClick={handleClearNonFrequentWords}
-                disabled={isClearing}
+                onClick={handleClearUniqueWords}
+                disabled={isClearingUniqueWords || !(user?.uniqueWordsEncountered?.length > 0)}
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2"
               >
-                {isClearing ? (
+                {isClearingUniqueWords ? (
                   <>
                     <RotateCcw className="h-4 w-4 animate-spin" />
                     Clearing...
@@ -301,7 +431,7 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
                 ) : (
                   <>
                     <RotateCcw className="h-4 w-4" />
-                    Clear List
+                    Clear Unique Words
                   </>
                 )}
               </Button>
