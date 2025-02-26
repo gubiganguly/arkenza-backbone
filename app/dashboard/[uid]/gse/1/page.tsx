@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { GSELayout } from "@/components/gse-layout";
 import TextHighlighter from "@/app/components/text-highlighter/TextHighlighter";
 import { userModel } from "@/lib/firebase/users/userModel";
-import { User } from "@/lib/firebase/users/userSchema";
+import { User, ProblemWord } from "@/lib/firebase/users/userSchema";
 import { useRouter } from "next/navigation";
 import { RefreshCw, BookOpen, Mic, Brain, ArrowRight, Heart, Scale, Info } from "lucide-react";
 import {
@@ -24,7 +24,7 @@ const INTRO_TEXT = `In this exercise, you'll practice reciting passages out loud
 
 const EXERCISE_STEPS = [
   "Make sure you are in a place where no one can hear you",
-  "Choose topics you would like to recite and generate the text passages",
+  "Choose topics you would like to recite and generate the text passages", 
   "Recite the text passages aloud",
   "If you hear anyone approaching, stop speaking until they are gone",
   "Add any newly discovered problematic words to your list",
@@ -102,14 +102,27 @@ const FINAL_SLIDE = {
   ]
 };
 
-// Add interface for API response
+// Update the GenerateTextResponse interface
 interface GenerateTextResponse {
   text: string;
   totalWordCount: number;
   newUniqueWords: string[];
   newUniqueWordCount: number;
   success: boolean;
+  problematicWords?: string[];
+  generationTimeMs: number;
+  startTime: string;
 }
+
+// Add helper function to format time
+const formatGenerationTime = (ms: number): string => {
+  return `${(ms / 1000).toFixed(2)}s`;
+};
+
+// Add these utility functions near the top with other helper functions
+const isProblemWordDuplicate = (words: ProblemWord[], newWord: string): boolean => {
+  return words.some(pw => pw.word.toLowerCase() === newWord.toLowerCase());
+};
 
 export default function GSE1Page({ params }: { params: { uid: string } }) {
   const router = useRouter();
@@ -122,10 +135,25 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
   const [showMoreInfo, setShowMoreInfo] = useState(false);
   const [showIntroModal, setShowIntroModal] = useState(true);
 
-  // Add new state variables for words and statistics
-  const [problemWords, setProblemWords] = useState<string[]>([]);
+  // Update state to use ProblemWord interface
+  const [problemWords, setProblemWords] = useState<ProblemWord[]>([]);
   const [totalWordCount, setTotalWordCount] = useState<number>(0);
   const [newUniqueWords, setNewUniqueWords] = useState<string[]>([]);
+
+  // Add state for generation data
+  const [generationData, setGenerationData] = useState<GenerateTextResponse | null>(null);
+
+  // Add state for passage timing
+  const [passageStartTime, setPassageStartTime] = useState<string | null>(null);
+
+  // Add these new state variables for topic rotation
+  const [currentTopicIndex, setCurrentTopicIndex] = useState<number>(0);
+  const [currentSubtopicIndex, setCurrentSubtopicIndex] = useState<number>(0);
+  const [currentTopic, setCurrentTopic] = useState<string>("");
+  const [currentSubtopic, setCurrentSubtopic] = useState<string>("");
+
+  // Add temperature control state
+  const [temperature, setTemperature] = useState<number>(0.7); // Default to 0.7
 
   useEffect(() => {
     const loadUser = async () => {
@@ -140,20 +168,94 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
   }, [params.uid]);
 
   useEffect(() => {
-    if (user?.interests && user.interests.length > 0 && !selectedInterest) {
-      setSelectedInterest(user.interests[0].name);
+    if (user?.interests && user.interests.length > 0) {
+      // Initialize with the first topic and subtopic
+      const firstTopic = user.interests[0];
+      setCurrentTopicIndex(0);
+      setCurrentSubtopicIndex(0);
+      setCurrentTopic(firstTopic.name);
+      
+      if (firstTopic.subInterests && firstTopic.subInterests.length > 0) {
+        setCurrentSubtopic(firstTopic.subInterests[0]);
+      } else {
+        setCurrentSubtopic("General");
+      }
     }
-  }, [user?.interests, selectedInterest]);
+  }, [user?.interests]);
 
-  // Add word management functions
-  const addBadWord = (word: string) => {
-    if (!problemWords.includes(word)) {
-      setProblemWords(prev => [...prev, word]);
+  // Load saved temperature from localStorage
+  useEffect(() => {
+    const savedTemp = localStorage.getItem('llm-temperature');
+    if (savedTemp) {
+      setTemperature(Number(savedTemp));
+    }
+  }, []);
+
+  // Add this function to advance to the next topic/subtopic
+  const advanceToNextTopic = () => {
+    if (!user?.interests || user.interests.length === 0) return;
+    
+    const currentTopicObj = user.interests[currentTopicIndex];
+    const hasSubtopics = currentTopicObj.subInterests && currentTopicObj.subInterests.length > 0;
+    
+    // If we have subtopics and haven't gone through all of them yet
+    if (hasSubtopics && currentSubtopicIndex < currentTopicObj.subInterests.length - 1) {
+      // Move to next subtopic
+      const nextSubtopicIndex = currentSubtopicIndex + 1;
+      setCurrentSubtopicIndex(nextSubtopicIndex);
+      setCurrentSubtopic(currentTopicObj.subInterests[nextSubtopicIndex]);
+    } else {
+      // Move to next topic
+      const nextTopicIndex = (currentTopicIndex + 1) % user.interests.length;
+      setCurrentTopicIndex(nextTopicIndex);
+      setCurrentSubtopicIndex(0);
+      
+      const nextTopic = user.interests[nextTopicIndex];
+      setCurrentTopic(nextTopic.name);
+      
+      if (nextTopic.subInterests && nextTopic.subInterests.length > 0) {
+        setCurrentSubtopic(nextTopic.subInterests[0]);
+      } else {
+        setCurrentSubtopic("General");
+      }
     }
   };
 
+  // Update addBadWord function to prevent duplicates
+  const addBadWord = async (word: string) => {
+    // Normalize the word to lowercase for comparison
+    const normalizedWord = word.toLowerCase();
+    
+    // Check if word already exists (case-insensitive)
+    if (!isProblemWordDuplicate(problemWords, normalizedWord)) {
+      try {
+        const response = await fetch('/api/word-frequency', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ word: normalizedWord })
+        });
+
+        if (!response.ok) throw new Error('Failed to get word frequency');
+        
+        const { frequency } = await response.json();
+        
+        // Add the word with its original case but compare in lowercase
+        setProblemWords(prev => [...prev, { word, frequency }]);
+      } catch (error) {
+        console.error('Error getting word frequency:', error);
+        // Add word with 0 frequency if lookup fails
+        setProblemWords(prev => [...prev, { word, frequency: 0 }]);
+      }
+    }
+  };
+
+  // Update removeBadWord function to handle case-insensitive removal
   const removeBadWord = (word: string) => {
-    setProblemWords(prev => prev.filter(w => w !== word));
+    setProblemWords(prev => 
+      prev.filter(pw => pw.word.toLowerCase() !== word.toLowerCase())
+    );
   };
 
   // Add function to save problem words
@@ -169,9 +271,10 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
     }
   };
 
+  // Modify the generateNewPassage function to use current topic/subtopic
   const generateNewPassage = async () => {
-    if (!selectedInterest) {
-      setError("Please select an interest first");
+    if (!currentTopic) {
+      setError("No topics available");
       return;
     }
 
@@ -182,24 +285,35 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       // Save current problem words before generating new passage
       await saveUserProblemWords();
 
-      const interestObj = user?.interests.find(i => i.name === selectedInterest);
-      if (!interestObj) {
-        throw new Error('Selected interest not found');
+      // If there's an existing passage, send timing data before generating new one
+      if (passageStartTime) {
+        await fetch('/api/passage-timing', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: params.uid,
+            startTime: passageStartTime,
+            endTime: new Date().toISOString()
+          })
+        });
       }
 
-      // Generate new passage with updated API parameters
+      // Generate new passage with current topic and subtopic
       const response = await fetch('/api/llm', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          interest: selectedInterest,
-          subInterests: interestObj.subInterests,
+          interest: currentTopic,
+          subInterests: currentSubtopic !== "General" ? [currentSubtopic] : [],
           userId: params.uid,
           problemWords,
           hideProblemWords: true,
-          emphasizeProblemWords: false
+          emphasizeProblemWords: false,
+          temperature
         })
       });
 
@@ -211,7 +325,13 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       const data: GenerateTextResponse = await response.json();
       
       if (data.text === "Not able to generate a passage with the selected problem words") {
-        setError("Could not generate text avoiding all problem words. Try removing some problem words.");
+        const problemWordsMessage = data.problematicWords && data.problematicWords.length > 0
+          ? `I am not able to generate a passage with these words: ${data.problematicWords.map(word => `**${word}**`).join(', ')}. Try removing some of these words or regenerating the passage.`
+          : '';
+        
+        setError(
+          `Could not generate text avoiding all problem words. ${problemWordsMessage}`
+        );
         return;
       }
 
@@ -219,7 +339,8 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       setGeneratedText(data.text);
       setTotalWordCount(data.totalWordCount);
       setNewUniqueWords(data.newUniqueWords);
-
+      setGenerationData(data);
+      
       // Update local user state with new unique words
       if (data.newUniqueWords.length > 0 && user) {
         const updatedUniqueWords = [...(user.uniqueWordsEncountered || []), ...data.newUniqueWords];
@@ -228,6 +349,15 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
           uniqueWordsEncountered: updatedUniqueWords
         } : null);
       }
+      
+      // Store new passage start time from API response
+      setPassageStartTime(data.startTime);
+      
+      // Store temperature in localStorage
+      localStorage.setItem('llm-temperature', temperature.toString());
+      
+      // Advance to the next topic/subtopic after successful generation
+      advanceToNextTopic();
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate text');
@@ -263,6 +393,21 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
         modulesCompleted: updatedModules
       });
 
+      // Send timing data before finishing
+      if (passageStartTime) {
+        await fetch('/api/passage-timing', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: params.uid,
+            startTime: passageStartTime,
+            endTime: new Date().toISOString()
+          })
+        });
+      }
+
       router.push(`/dashboard/${params.uid}`);
     } catch (error) {
       console.error('Error updating module status:', error);
@@ -278,6 +423,63 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       </div>
     );
   }
+
+  // Add temperature control component
+  const temperatureControl = (
+    <div className="flex items-center gap-2 mb-4">
+      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Creativity:</span>
+      <input
+        type="number"
+        min="0"
+        max="1"
+        step="0.01"
+        value={temperature}
+        onChange={(e) => {
+          const value = Number(e.target.value);
+          if (value >= 0 && value <= 1) {
+            setTemperature(value);
+          }
+        }}
+        className="w-20 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300"
+      />
+    </div>
+  );
+
+  // Create the topic display component
+  const topicAndGenerateSection = (
+    <div className="w-full bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex flex-col gap-1 w-full md:w-auto">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Topic:</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{currentTopic}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Subtopic:</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{currentSubtopic}</span>
+          </div>
+        </div>
+        
+        <Button
+          onClick={generateNewPassage}
+          disabled={isGenerating || !currentTopic}
+          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 w-full md:w-auto"
+        >
+          {isGenerating ? (
+            <>
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="h-4 w-4" />
+              Generate New Passage
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
     <GSELayout>
@@ -335,73 +537,33 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       <Card className="relative mb-8 p-8">
         <div className="prose mx-auto max-w-none">
           <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 justify-between">
-              <div className="w-full md:w-[300px]">
-                <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                    Select an interest
-                  </p>
-                  <div className="group relative">
-                    <Info className="h-4 w-4 text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 cursor-help" />
-                    <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-gray-800 text-white text-xs rounded-lg shadow-lg z-10">
-                      Please select one of your interests. This interest will be used to generate the text passage below
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
-                    </div>
-                  </div>
-                </div>
-                <Select
-                  value={selectedInterest}
-                  onValueChange={setSelectedInterest}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Choose a topic" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {user?.interests?.map((interest) => (
-                      <SelectItem key={interest.name} value={interest.name}>
-                        {interest.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                onClick={generateNewPassage}
-                disabled={isGenerating || !selectedInterest}
-                className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 w-full md:w-auto"
-              >
-                {isGenerating ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4" />
-                    Generate New Passage
-                  </>
-                )}
-              </Button>
-            </div>
-
+            {temperatureControl}
+            {topicAndGenerateSection}
+            
             {error && (
-              <p className="text-sm text-red-500 dark:text-red-400">
-                {error}
-              </p>
+              <p 
+                className="text-sm text-red-500 dark:text-red-400"
+                dangerouslySetInnerHTML={{
+                  __html: error.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold">$1</strong>')
+                }}
+              />
             )}
 
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6">
               <TextHighlighter
                 text={generatedText}
-                highlightedWords={problemWords}
+                highlightedWords={problemWords.map(pw => pw.word)}
                 addBadWord={addBadWord}
                 removeBadWord={removeBadWord}
               />
 
               {/* Word Statistics */}
-              {totalWordCount > 0 && (
+              {totalWordCount > 0 && generationData && (
                 <div className="flex items-center justify-end gap-6 text-sm mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div>
+                    <span className="font-medium text-gray-600 dark:text-gray-400">Generation Time: </span>
+                    <span className="text-blue-600 dark:text-blue-400">{formatGenerationTime(generationData.generationTimeMs)}</span>
+                  </div>
                   <div>
                     <span className="font-medium text-gray-600 dark:text-gray-400">Total Words: </span>
                     <span className="text-blue-600 dark:text-blue-400">{totalWordCount}</span>

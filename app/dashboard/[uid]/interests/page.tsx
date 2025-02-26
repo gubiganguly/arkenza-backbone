@@ -82,6 +82,9 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
   const [selectedInterest, setSelectedInterest] = useState<Interest | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Add state to track total sub-interests count
+  const [totalSubInterests, setTotalSubInterests] = useState(0);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -89,6 +92,12 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
       if (userData) {
         setUser(userData);
         setInterests(userData.interests);
+        
+        // Calculate initial total sub-interests
+        const initialTotal = userData.interests.reduce(
+          (total, interest) => total + interest.subInterests.length, 0
+        );
+        setTotalSubInterests(initialTotal);
       }
     };
 
@@ -114,6 +123,8 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
           : i
       );
       setInterests(updatedInterests);
+      // Update total sub-interests count
+      setTotalSubInterests(prev => prev + 1);
       // Update the selected interest to reflect the changes
       const updatedSelectedInterest = updatedInterests.find(i => i.name === parentInterest.name);
       if (updatedSelectedInterest) {
@@ -123,6 +134,13 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
   };
 
   const removeInterest = (interestName: string) => {
+    // Find the interest to get its sub-interests count before removing
+    const interestToRemove = interests.find(i => i.name === interestName);
+    if (interestToRemove) {
+      // Update total sub-interests count
+      setTotalSubInterests(prev => prev - interestToRemove.subInterests.length);
+    }
+    
     setInterests(prev => prev.filter(i => i.name !== interestName));
     if (selectedInterest?.name === interestName) {
       setSelectedInterest(null);
@@ -135,6 +153,8 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
         ? { ...i, subInterests: i.subInterests.filter(sub => sub !== subInterest) }
         : i
     ));
+    // Update total sub-interests count
+    setTotalSubInterests(prev => prev - 1);
   };
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -147,6 +167,13 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
 
   const handleFinish = async () => {
     if (!user) return;
+
+    // Check if user has selected at least 25 sub-interests
+    if (totalSubInterests < 25) {
+      setErrorMessage(`Please select at least 25 sub-interests. You've selected ${totalSubInterests} so far.`);
+      setTimeout(() => setErrorMessage(null), 5000);
+      return;
+    }
 
     try {
       setIsUpdating(true);
@@ -217,7 +244,32 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
               </span>
             </span>
           </p>
+          
+          {/* Add progress indicator */}
+          <div className="mt-4 flex flex-col items-center">
+            <div className="w-full max-w-md bg-gray-200 rounded-full h-2.5 mb-2">
+              <div 
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-in-out" 
+                style={{ width: `${Math.min(100, (totalSubInterests / 25) * 100)}%` }}
+              ></div>
+            </div>
+            <p className="text-sm font-medium text-gray-700">
+              {totalSubInterests} of 25 required sub-interests selected
+              {totalSubInterests >= 25 && (
+                <span className="ml-2 text-green-600 inline-flex items-center">
+                  <Check className="h-4 w-4 mr-1" /> Ready to proceed
+                </span>
+              )}
+            </p>
+          </div>
         </div>
+
+        {/* Display error message if any */}
+        {errorMessage && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-200 text-red-700 rounded-md text-center">
+            {errorMessage}
+          </div>
+        )}
 
         <div className="grid grid-cols-12 gap-6">
           {/* Left side - Main interests */}
@@ -278,11 +330,6 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
                 <h2 className="font-semibold mb-4">
                   Sub-interests for {selectedInterest.name}
                 </h2>
-                {errorMessage && (
-                  <p className="text-red-500 text-sm mb-3">
-                    {errorMessage}
-                  </p>
-                )}
                 <div className="grid grid-cols-2 gap-2">
                   {PREDEFINED_INTERESTS[selectedInterest.name].map((sub) => {
                     const currentInterest = interests.find(i => i.name === selectedInterest.name);
@@ -330,14 +377,25 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
           </Card>
         </div>
 
-        <div className="text-center mt-4">
+        <div className="text-center mt-6">
           <Button
             onClick={handleFinish}
-            disabled={isUpdating}
-            className="bg-green-600 hover:bg-green-700"
+            disabled={isUpdating || totalSubInterests < 25}
+            className={`
+              transition-all duration-300
+              ${totalSubInterests >= 25 
+                ? "bg-green-600 hover:bg-green-700" 
+                : "bg-gray-400 cursor-not-allowed"}
+            `}
           >
             {isUpdating ? "Updating..." : "Finish"}
           </Button>
+          
+          {totalSubInterests < 25 && (
+            <p className="mt-2 text-amber-600 text-sm">
+              Please select {25 - totalSubInterests} more sub-interests to continue
+            </p>
+          )}
         </div>
       </div>
     </div>

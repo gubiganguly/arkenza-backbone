@@ -11,7 +11,7 @@ import {
   getDocs
 } from 'firebase/firestore';
 import { FIREBASE_DB } from '../config';
-import { User, CreateUserData, UpdateUserData, ModuleStatus } from './userSchema';
+import { User, CreateUserData, UpdateUserData, ModuleStatus, ProblemWord } from './userSchema';
 
 const COLLECTION_NAME = 'users';
 const usersRef = collection(FIREBASE_DB, COLLECTION_NAME);
@@ -32,7 +32,8 @@ export const userModel = {
     
     const user: User = {
       id: userId,
-      ...userData, 
+      ...userData,
+      problemWords: [],
       modulesCompleted: initialModuleStatuses,
       createdAt: new Date(),
       updatedAt: new Date()

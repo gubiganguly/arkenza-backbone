@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { userModel } from "@/lib/firebase/users/userModel";
+import { ProblemWord } from '@/lib/firebase/users/userSchema';
 
 // Set the runtime to nodejs since we're using OpenAI's SDK
 export const runtime = 'nodejs';
@@ -40,16 +41,30 @@ const findNewUniqueWords = (text: string, existingWords: string[]): string[] => 
  * @param problemWords - Array of words that should not appear in the text
  * @returns boolean indicating if any problem words were found
  */
-const containsProblemWords = (text: string, problemWords: string[]): boolean => {
-  // Convert text to lowercase
+const containsProblemWords = (text: string, problemWords: ProblemWord[]): boolean => {
   const lowerText = text.toLowerCase();
   
-  // Check if any problem word exists in the text using word boundaries
-  return problemWords.some(problemWord => {
-    const regex = new RegExp(`\\b${problemWord.toLowerCase()}\\b`, 'i');
+  return problemWords.some(pw => {
+    const regex = new RegExp(`\\b${pw.word.toLowerCase()}\\b`, 'i');
     return regex.test(lowerText);
   });
 }
+
+/**
+ * Finds problematic words in a text
+ * @param text - The text to find problematic words in
+ * @param problemWords - Array of problem words
+ * @returns Array of problematic words found in the text
+ */
+const findProblematicWords = (text: string, problemWords: ProblemWord[]): string[] => {
+  const lowerText = text.toLowerCase();
+  return problemWords
+    .filter(pw => {
+      const regex = new RegExp(`\\b${pw.word.toLowerCase()}\\b`, 'i');
+      return regex.test(lowerText);
+    })
+    .map(pw => pw.word);
+};
 
 /**
  * Generates text content using OpenAI's GPT-4 model based on given parameters
@@ -59,17 +74,21 @@ const containsProblemWords = (text: string, problemWords: string[]): boolean => 
  * @param problemWords - Array of words that should not appear in the text
  * @param hideProblemWords - Whether to avoid using problem words
  * @param emphasizeProblemWords - Whether to intentionally include problem words
+ * @param temperature - The temperature for the OpenAI model
  * @returns Generated text content or error message
  */
 const generateText = async (
   openai: OpenAI,
   topic: string,
   subInterests: string[],
-  problemWords: string[],
+  problemWords: ProblemWord[],
   hideProblemWords: boolean,
-  emphasizeProblemWords: boolean
-): Promise<string> => {
+  emphasizeProblemWords: boolean,
+  temperature: number
+): Promise<{ text: string; problematicWords?: string[]; generationTimeMs: number }> => {
   let attempts = 0;
+  let lastGeneratedText = '';
+  const startTime = Date.now();
 
   while (attempts <= MAX_RETRIES) {
     // Create system prompt based on word usage preferences
@@ -77,10 +96,10 @@ const generateText = async (
 Please ensure the output is readable at a general audience level.`;
 
     if (hideProblemWords) {
-      systemPrompt += `\nIMPORTANT: You must NOT use any of these words in your response: ${problemWords.join(', ')}.
+      systemPrompt += `\nIMPORTANT: You must NOT use any of these words in your response: ${problemWords.map(pw => pw.word).join(', ')}.
 Use alternative words or rephrase sentences to avoid these prohibited words.`;
     } else if (emphasizeProblemWords && problemWords.length > 0) {
-      systemPrompt += `\nIMPORTANT: Try to naturally incorporate some of these words in your response: ${problemWords.join(', ')}.
+      systemPrompt += `\nIMPORTANT: Try to naturally incorporate some of these words in your response: ${problemWords.map(pw => pw.word).join(', ')}.
 Don't force all words, but aim to use at least a few of them where they fit naturally.`;
     }
 
@@ -98,20 +117,31 @@ Don't force all words, but aim to use at least a few of them where they fit natu
         },
       ],
       model: "gpt-4",
-      temperature: 0.7,
+      temperature: temperature,
     });
 
     const generatedText = chatCompletion.choices[0].message.content || '';
+    lastGeneratedText = generatedText; // Save the last generated text
 
     // Only verify no problem words are present if hideProblemWords is true
     if (!hideProblemWords || !containsProblemWords(generatedText, problemWords)) {
-      return generatedText;
+      return { 
+        text: generatedText,
+        generationTimeMs: Date.now() - startTime
+      };
     }
 
     attempts++;
   }
 
-  return "Not able to generate a passage with the selected problem words";
+  // If we failed to generate valid text, return the problematic words
+  const foundProblematicWords = findProblematicWords(lastGeneratedText, problemWords);
+  
+  return { 
+    text: "Not able to generate a passage with the selected problem words",
+    problematicWords: foundProblematicWords,
+    generationTimeMs: Date.now() - startTime
+  };
 }
 
 /**
@@ -137,7 +167,8 @@ export async function POST(request: Request) {
       userId, 
       problemWords = [], 
       hideProblemWords = false,
-      emphasizeProblemWords = false 
+      emphasizeProblemWords = false,
+      temperature = 0.99
     } = body;
 
     // Validate required parameters
@@ -170,37 +201,68 @@ export async function POST(request: Request) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    // Generate text content
-    const text = await generateText(
+    const result = await generateText(
       openai,
       interest,
       subInterests,
       problemWords,
       hideProblemWords,
-      emphasizeProblemWords
+      emphasizeProblemWords,
+      temperature
     );
+    
+    if (result.text === "Not able to generate a passage with the selected problem words") {
+      // Update user's passage history
+      await userModel.update(userId, {
+        passageHistory: [...(user.passageHistory || []), {
+          newUniqueWordCount: 0,
+          generationTimeMs: result.generationTimeMs,
+          success: false,
+          startTime: new Date(),
+          endTime: new Date(), // Same as startTime for failed generations
+          timeSpentMs: 0,
+          totalWordCount: 0
+        }]
+      });
 
-    // Only process unique words if text generation was successful
+      return NextResponse.json({ 
+        text: result.text,
+        problematicWords: result.problematicWords,
+        generationTimeMs: result.generationTimeMs,
+        success: false,
+        startTime: new Date().toISOString() // Add timestamp for client
+      }, { status: 200 });
+    }
+
+    // Process unique words if text generation was successful
     let newUniqueWords: string[] = [];
     let totalWordCount = 0;
     
-    if (text !== "Not able to generate a passage with the selected problem words") {
-      totalWordCount = countWords(text);
-      newUniqueWords = findNewUniqueWords(text, user.uniqueWordsEncountered || []);
-      
-      if (newUniqueWords.length > 0) {
-        await userModel.update(userId, {
-          uniqueWordsEncountered: [...(user.uniqueWordsEncountered || []), ...newUniqueWords]
-        });
-      }
-    }
+    totalWordCount = countWords(result.text);
+    newUniqueWords = findNewUniqueWords(result.text, user.uniqueWordsEncountered || []);
+    
+    // Update user data including passage history
+    await userModel.update(userId, {
+      uniqueWordsEncountered: [...(user.uniqueWordsEncountered || []), ...newUniqueWords],
+      passageHistory: [...(user.passageHistory || []), {
+        newUniqueWordCount: newUniqueWords.length,
+        generationTimeMs: result.generationTimeMs,
+        success: true,
+        startTime: new Date(),
+        endTime: new Date(), // Will be updated when user finishes
+        timeSpentMs: 0, // Will be updated when user finishes
+        totalWordCount: totalWordCount
+      }]
+    });
 
     return NextResponse.json({ 
-      text,
+      text: result.text,
       totalWordCount,
       newUniqueWords,
       newUniqueWordCount: newUniqueWords.length,
-      success: text !== "Not able to generate a passage with the selected problem words"
+      generationTimeMs: result.generationTimeMs,
+      success: true,
+      startTime: new Date().toISOString() // Add timestamp for client
     }, { status: 200 });
 
   } catch (error) {

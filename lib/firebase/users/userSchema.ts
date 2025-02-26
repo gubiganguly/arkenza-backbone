@@ -9,15 +9,31 @@ export interface Interest {
   subInterests: string[];
 }
 
-export interface User {
+export interface ProblemWord {
+  word: string;
+  frequency: number;
+}
+
+export interface PassageMetadata {
+  newUniqueWordCount: number;
+  generationTimeMs: number;
+  success: boolean;
+  startTime: Date;
+  endTime: Date;
+  timeSpentMs: number;
+  totalWordCount: number;
+}
+
+export interface User { 
   id: string;
   name: string;
   email: string;
-  problemWords: string[];
+  problemWords: ProblemWord[];
   interests: Interest[];
   modulesCompleted: ModuleStatus[];
   usedNonFrequentWords: string[];
   uniqueWordsEncountered: string[];
+  passageHistory: PassageMetadata[];
   createdAt: Date; 
   updatedAt: Date; 
   // Add any additional user fields you need

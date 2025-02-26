@@ -65,7 +65,7 @@ export function SlideDeckModal({
                             <span className="text-sm font-medium">{item.label}</span>
                             <Switch 
                               checked={item.enabled}
-                              className="data-[state=checked]:bg-red-500 data-[state=checked]:hover:bg-red-600"
+                              className="data-[state=checked]:bg-green-500 data-[state=checked]:hover:bg-green-600 data-[state=unchecked]:bg-red-500 data-[state=unchecked]:hover:bg-red-600"
                             />
                           </div>
                         ))}
@@ -76,7 +76,7 @@ export function SlideDeckModal({
                             <span className="text-sm font-medium">{item.label}</span>
                             <Switch 
                               checked={item.enabled}
-                              className="data-[state=checked]:bg-red-500 data-[state=checked]:hover:bg-red-600"
+                              className="data-[state=checked]:bg-green-500 data-[state=checked]:hover:bg-green-600 data-[state=unchecked]:bg-red-500 data-[state=unchecked]:hover:bg-red-600"
                             />
                           </div>
                         ))}
@@ -110,7 +110,7 @@ export function SlideDeckModal({
                             <Switch 
                               checked={item.enabled}
                               disabled={true}
-                              className="data-[state=checked]:bg-red-500 data-[state=checked]:hover:bg-red-600 cursor-not-allowed opacity-50"
+                              className="data-[state=checked]:bg-green-500 data-[state=checked]:hover:bg-green-600 data-[state=unchecked]:bg-red-500 data-[state=unchecked]:hover:bg-red-600 cursor-not-allowed opacity-50"
                             />
                           </div>
                         ))}
