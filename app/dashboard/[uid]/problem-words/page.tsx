@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, Check, RefreshCw, RotateCcw, Info } from "lucide-react";
+import { ArrowLeft, Trash2, Check, RefreshCw, RotateCcw, Info, Mic, Settings, ShieldCheck, Dumbbell, ListChecks } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TextHighlighter from "@/app/components/text-highlighter/TextHighlighter";
 import { useRouter } from "next/navigation";
@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SlideDeckModal } from "@/components/slide-deck-modal";
 
 // Add these interfaces for API response types
 interface GenerateTextResponse {
@@ -73,6 +74,62 @@ const formatGenerationTime = (ms: number): string => {
   return `${(ms / 1000).toFixed(2)}s`;
 };
 
+// Add these constants after the existing helper functions
+const INTRO_SLIDES = [
+  {
+    title: "Welcome to Problem Words",
+    content: "In this step, you'll identify words that are difficult for you to pronounce. These will be used to customize your recitation passages throughout your fluency journey.",
+    icon: <Info className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  },
+  {
+    title: "Why We Track Problem Words",
+    content: "By identifying words you find challenging to pronounce, we can customize future recitation passages to either avoid these words entirely or provide targeted practice with them.",
+    icon: <Mic className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  },
+  {
+    title: "How It Works",
+    content: "When you click on a word in the passage, it's added to your problem words list. Future passages can either remove these words (Hide Problem Words) or specifically include them for practice (Practice Problem Words).",
+    icon: <Settings className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  }
+];
+
+const FINAL_SLIDE = {
+  title: "Problem Words Collection",
+  description: "Identify words that are challenging for you to pronounce so we can customize your future recitation passages.",
+  duration: "10-15",
+  deviceSettings: [
+    {
+      column1: [
+        { label: "Word Tracking", enabled: true },
+        { label: "Frequency Analysis", enabled: true },
+        { label: "Word Avoidance", enabled: true }
+      ],
+      column2: [
+        { label: "Targeted Practice", enabled: true },
+        { label: "Audio Recording", enabled: false },
+        { label: "Speech Analysis", enabled: false }
+      ]
+    }
+  ],
+  tools: [
+    {
+      icon: <ShieldCheck className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Word Filtering",
+      description: "Removes difficult words from future passages"
+    },
+    {
+      icon: <Dumbbell className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Targeted Practice",
+      description: "Option to practice specifically with difficult words"
+    },
+    {
+      icon: <ListChecks className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Progress Tracking",
+      description: "Monitor your progress with challenging words"
+    }
+  ]
+};
+
 export default function ProblemWords({ params }: { params: { uid: string } }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -113,6 +170,9 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
   const [currentSubtopicIndex, setCurrentSubtopicIndex] = useState<number>(0);
   const [currentTopic, setCurrentTopic] = useState<string>("");
   const [currentSubtopic, setCurrentSubtopic] = useState<string>("");
+
+  // Add this state inside the component function
+  const [showIntroModal, setShowIntroModal] = useState(true);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -184,7 +244,7 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
     try {
       setIsUpdating(true);
 
-      const currentModuleId = 3;
+      const currentModuleId = 4;
       const nextModuleId = currentModuleId + 1;
 
       const updatedModules = user.modulesCompleted.map(module => {
@@ -497,6 +557,13 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-blue-950 dark:to-gray-950 p-8">
+      <SlideDeckModal
+        isOpen={showIntroModal}
+        onClose={() => setShowIntroModal(false)}
+        slides={INTRO_SLIDES}
+        finalSlide={null}
+      />
+      
       {/* Back button */}
       <div className="absolute left-8 top-8">
         <Button
@@ -526,7 +593,7 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
           </p>
           {showMoreInfo && (
             <p className="mt-4 text-gray-600 dark:text-gray-400 text-sm max-w-2xl mx-auto">
-              Please take some time to read through a few passages and identify words that you may have trouble pronouncing. You can generate new passages and select words in that passage to take note of which words are causing you problems. Once you are done, click the Finish button to save your problem words.
+              Please take some time to recite through a few passages and identify words that you may have trouble pronouncing. You can generate new passages and select words in that passage to take note of which words are causing you problems. Once you are done, click the Finish button to save your problem words.
             </p>
           )}
         </div>

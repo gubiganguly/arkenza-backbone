@@ -29,12 +29,19 @@ export interface Slide {
   icon?: ReactNode;
 }
 
+export interface SpeechHearingSetting {
+  label: string;
+  enabled: boolean;
+  tooltip?: string;
+}
+
 export interface FinalSlide {
   title: string;
   description: string;
   duration: string;
   deviceSettings: SettingColumns[];
   tools: Tool[];
+  speechHearingSettings?: SpeechHearingSetting[];
 }
 
 export interface ModuleContent {
@@ -47,7 +54,7 @@ export interface SlideDeckModalProps {
   isOpen: boolean;
   onClose: () => void;
   slides: SlideContent[];
-  finalSlide: FinalSlide;
+  finalSlide: FinalSlide | null;
   onFinish?: () => void;
 }
 

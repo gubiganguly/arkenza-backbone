@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, X, Info, Check } from "lucide-react";
+import { ArrowLeft, Plus, X, Info, Check, Heart, Layers, BookOpen, Repeat, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { userModel } from "@/lib/firebase/users/userModel";
 import { User, Interest } from "@/lib/firebase/users/userSchema";
+import { SlideDeckModal } from "@/components/slide-deck-modal";
 
 // Predefined interests and sub-interests
 const PREDEFINED_INTERESTS: Record<string, string[]> = {
@@ -75,6 +76,62 @@ const PREDEFINED_INTERESTS: Record<string, string[]> = {
   ]
 };
 
+// Add these constants below other constants
+const INTRO_SLIDES = [
+  {
+    title: "Welcome to Interest Selection",
+    content: "In this step, you'll select topics and sub-topics that interest you. These will be used to generate personalized reading passages throughout your fluency journey.",
+    icon: <Info className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  },
+  {
+    title: "Why We Need Your Interests",
+    content: "You'll be reading many passages during your fluency practice. By knowing your interests, we can make these passages more engaging and relevant to you, which makes practice more enjoyable and effective.",
+    icon: <Heart className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  },
+  {
+    title: "Variety Matters",
+    content: "Selecting at least 25 different sub-interests helps us provide diverse content and prevents passages from becoming repetitive. This variety also exposes you to different vocabulary and contexts, which is crucial for developing natural fluency.",
+    icon: <Layers className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+  }
+];
+
+const FINAL_SLIDE = {
+  title: "Interest Selection",
+  description: "Select 25+ sub-interests to help us generate diverse, personalized reading passages throughout your fluency journey.",
+  duration: "5-10",
+  deviceSettings: [
+    {
+      column1: [
+        { label: "Content Personalization", enabled: true },
+        { label: "Fluency Analysis", enabled: false },
+        { label: "Topic Diversity", enabled: true }
+      ],
+      column2: [
+        { label: "Interest Tracking", enabled: true },
+        { label: "Reading Metrics", enabled: false },
+        { label: "Interest Suggestions", enabled: true }
+      ]
+    }
+  ],
+  tools: [
+    {
+      icon: <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Personalized Content",
+      description: "Passages tailored to topics you care about"
+    },
+    {
+      icon: <Repeat className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Diverse Topics",
+      description: "Variety prevents repetition and boredom"
+    },
+    {
+      icon: <GraduationCap className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
+      label: "Effective Learning",
+      description: "Interesting content makes practice more engaging"
+    }
+  ]
+};
+
 export default function InterestsPage({ params }: { params: { uid: string } }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -85,6 +142,9 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
   
   // Add state to track total sub-interests count
   const [totalSubInterests, setTotalSubInterests] = useState(0);
+
+  // Add this state inside the component function
+  const [showIntroModal, setShowIntroModal] = useState(true);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -179,7 +239,7 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
       setIsUpdating(true);
 
       // Update interests
-      const currentModuleId = 2; // Interests module ID
+      const currentModuleId = 3; // Interests module ID
       const nextModuleId = currentModuleId + 1;
 
       // Update the current module's status and unlock the next one
@@ -217,6 +277,13 @@ export default function InterestsPage({ params }: { params: { uid: string } }) {
 
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-blue-50 to-white p-6">
+      <SlideDeckModal
+        isOpen={showIntroModal}
+        onClose={() => setShowIntroModal(false)}
+        slides={INTRO_SLIDES}
+        finalSlide={null}
+      />
+      
       {/* Back button */}
       <div className="absolute left-8 top-8">
         <Button
