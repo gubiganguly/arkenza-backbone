@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { GSELayout } from "@/components/gse-layout";
@@ -8,7 +8,7 @@ import TextHighlighter from "@/app/components/text-highlighter/TextHighlighter";
 import { userModel } from "@/lib/firebase/users/userModel";
 import { User, ProblemWord } from "@/lib/firebase/users/userSchema";
 import { useRouter } from "next/navigation";
-import { RefreshCw, BookOpen, Mic, Brain, ArrowRight, Heart, Scale, Info, Play, Pause } from "lucide-react";
+import { RefreshCw, BookOpen, Mic, Brain, ArrowRight, Heart, Scale, Info } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -20,7 +20,7 @@ import { SlideDeckModal } from "@/components/slide-deck-modal";
 
 const HELP_TEXT = `Please take some time to recite a few passages and identify words that you may have trouble pronouncing. You can generate new passages and select words in that passage to take note of which words are causing you problems. Once you are done, click the Finish button to save your problem words.`;
 
-const INTRO_TEXT = `In this exercise, you'll practice reciting passages out loud while identifying words that are challenging to pronounce. This will help improve your pronunciation skills and build confidence in speaking English.`;
+const INTRO_TEXT = `In this exercise, you'll practice reciting sanitized passages out loud while identifying words that are challenging to pronounce. This will help improve your pronunciation skills and build confidence in speaking English.`;
 
 const EXERCISE_STEPS = [
   "Make sure you are in a place where no one can hear you",
@@ -32,15 +32,15 @@ const EXERCISE_STEPS = [
 ];
 
 const TOOL_DESCRIPTIONS = {
-  reading: "Practice reciting passages aloud to improve pronunciation",
+  reading: "Practice reciting sanitized passages aloud to improve pronunciation",
   speaking: "Focus on clear speech and proper word pronunciation",
   learning: "Learn and track challenging words to enhance vocabulary"
 };
 
 const INTRO_SLIDES = [
   {
-    title: "Welcome to GSE 2",
-    content: "Welcome to your second Graduated Speaking Exercise (GSE)! This is the next step of your journey to improved fluency. In this GSE, you will recite text passages in complete privacy, with absolutely no monitoring or recording. This is your safe space to practice.",
+    title: "Welcome to GSE 3",
+    content: "Welcome to your third Graduated Speaking Exercise (GSE)! This is the continuation of your journey to improved fluency. In this GSE, you will recite sanitized text passages in complete privacy, with absolutely no monitoring or recording. This is your safe space to practice.",
     icon: <BookOpen className="h-8 w-8 text-blue-600 dark:text-blue-400" />
   },
   {
@@ -50,7 +50,7 @@ const INTRO_SLIDES = [
   },
   {
     title: "AI-Powered Practice",
-    content: "The text passages are written by artificial intelligence (ChatGPT), customized to your interests. Simply choose the topics you'd like to recite about, and ChatGPT will generate personalized passages. What's more impressive is that it will automatically avoid using any words you've identified as problematic, making your practice more effective and comfortable.",
+    content: "The text passages are written by artificial intelligence (ChatGPT), customized to your interests. What's more impressive is that it will automatically avoid using any words you've identified as problematic, making your practice more effective and comfortable with sanitized content.",
     icon: <Brain className="h-8 w-8 text-blue-600 dark:text-blue-400" />
   },
   {
@@ -66,8 +66,8 @@ const INTRO_SLIDES = [
 ];
 
 const FINAL_SLIDE = {
-  title: "GSE 2: Recite Aloud",
-  description: "Practice reciting passages out loud while identifying words that are challenging to pronounce. This will help improve your pronunciation skills and build confidence in speaking English.",
+  title: "GSE 3: Recite Sanitized Text",
+  description: "Practice reciting sanitized passages out loud while identifying words that are challenging to pronounce. This will help improve your pronunciation skills and build confidence in speaking English.",
   duration: "120-240",
   deviceSettings: [
     {
@@ -87,7 +87,7 @@ const FINAL_SLIDE = {
     {
       icon: <BookOpen className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
       label: "Reciting",
-      description: "Practice with AI-generated passages tailored to your interests"
+      description: "Practice with AI-generated sanitized passages tailored to your interests"
     },
     {
       icon: <Mic className="h-5 w-5 text-blue-600 dark:text-blue-400" />,
@@ -132,7 +132,7 @@ const isProblemWordDuplicate = (words: ProblemWord[], newWord: string): boolean 
   return words.some(pw => pw.word.toLowerCase() === newWord.toLowerCase());
 };
 
-export default function GSE2Page({ params }: { params: { uid: string } }) {
+export default function GSE3Page({ params }: { params: { uid: string } }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [selectedInterest, setSelectedInterest] = useState<string>("");
@@ -162,12 +162,6 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
 
   // Add temperature control state
   const [temperature, setTemperature] = useState<number>(0.7); // Default to 0.7
-
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Add a loading state for TTS
-  const [isTTSLoading, setIsTTSLoading] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -325,7 +319,7 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
           subInterests: currentSubtopic !== "General" ? [currentSubtopic] : [],
           userId: params.uid,
           problemWords,
-          hideProblemWords: false,
+          hideProblemWords: true,
           emphasizeProblemWords: false,
           temperature
         })
@@ -390,10 +384,13 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
       // Save problem words before completing the module
       await saveUserProblemWords();
 
-      const currentModuleId = 6; // GSE 2 module ID
+      const currentModuleId = 7; // GSE 3 module ID
       const nextModuleId = currentModuleId + 1;
 
-      const updatedModules = user.modulesCompleted.map(module => {
+      // Ensure the next module exists in the array (for existing users who might not have it)
+      const hasNextModule = user.modulesCompleted.some(module => module.id === nextModuleId);
+      
+      let updatedModules = user.modulesCompleted.map(module => {
         if (module.id === currentModuleId) {
           return { ...module, isCompleted: true };
         }
@@ -402,6 +399,11 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
         }
         return module;
       });
+
+      // Add the next module if it doesn't exist
+      if (!hasNextModule) {
+        updatedModules.push({ id: nextModuleId, isUnlocked: true, isCompleted: false });
+      }
 
       await userModel.update(params.uid, {
         modulesCompleted: updatedModules
@@ -427,71 +429,6 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
       console.error('Error updating module status:', error);
     } finally {
       setIsUpdating(false);
-    }
-  };
-
-  // Update the toggleTTS function with better error handling and text chunking
-  const toggleTTS = async () => {
-    if (isPlaying && audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      return;
-    }
-    
-    try {
-      setIsTTSLoading(true);
-      setError(null); // Clear any previous errors
-      
-      // Limit text length to prevent quota issues
-      const maxChars = 2000; // Conservative limit
-      const textToSynthesize = generatedText.length > maxChars ? 
-        generatedText.substring(0, maxChars) + "..." : 
-        generatedText;
-      
-      const response = await fetch('/api/tts/elevenlabs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: textToSynthesize
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('TTS API error:', errorData);
-        
-        // Better error handling for quota exceeded
-        if (errorData.details && errorData.details.includes("quota_exceeded")) {
-          throw new Error('ElevenLabs rate limit reached. Please try again in a few minutes.');
-        } else if (errorData.status === 401 || errorData.status === 403) {
-          throw new Error('API key authentication failed. Please check your ElevenLabs API key.');
-        } else if (errorData.status === 429) {
-          throw new Error('Rate limit exceeded. Please try again later.');
-        } else {
-          throw new Error(`Failed to generate speech: ${errorData.error || 'Unknown error'}`);
-        }
-      }
-      
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = audioUrl;
-        audioRef.current.play();
-        setIsPlaying(true);
-        
-        audioRef.current.onended = () => {
-          setIsPlaying(false);
-        };
-      }
-    } catch (error) {
-      console.error('Error with TTS:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate speech. Please try again.');
-    } finally {
-      setIsTTSLoading(false);
     }
   };
 
@@ -570,9 +507,9 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
       />
 
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-blue-950 dark:text-blue-100">GSE 2: Recite Aloud</h1>
+        <h1 className="text-3xl font-bold text-blue-950 dark:text-blue-100">GSE 3: Recite Sanitized Text</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1">
-          Practice reciting text with clear pronunciation
+          Practice reciting sanitized text with clear pronunciation
           <button
             onClick={() => setShowMoreInfo(!showMoreInfo)}
             className="ml-2 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline text-sm font-medium inline-flex items-center"
@@ -629,32 +566,6 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
             )}
 
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6">
-              <div className="mb-4">
-                <Button
-                  onClick={toggleTTS}
-                  disabled={isTTSLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-                >
-                  {isTTSLoading ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      Loading Audio...
-                    </>
-                  ) : isPlaying ? (
-                    <>
-                      <Pause className="h-4 w-4" />
-                      Pause Choral Reading
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4" />
-                      Begin Choral Reading
-                    </>
-                  )}
-                </Button>
-                <audio ref={audioRef} className="hidden" />
-              </div>
-              
               <TextHighlighter
                 text={generatedText}
                 highlightedWords={problemWords.map(pw => pw.word)}

@@ -88,7 +88,7 @@ export default function IntroductionPage({ params }: { params: { uid: string } }
         <Button 
           onClick={handleFinish}
           disabled={isUpdating}
-          className="bg-green-500 hover:bg-green-600 text-white px-6 py-2 rounded-md"
+          className="bg-green-500 hover:bg-green-600 text-white px-9 py-3 rounded-md text-lg"
         >
           {isUpdating ? "Updating..." : "Finish"}
         </Button>

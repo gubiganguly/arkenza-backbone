@@ -70,7 +70,7 @@ export default function UserDashboard({ params }: { params: { uid: string } }) {
     {
       id: 5,
       name: "GSE 1",
-      description: "Recite Sanitized Text Alone",
+      description: "Choral Reading of Sanitized Text",
       estimatedTime: 120,
       ...getModuleStatus(5),
       href: `/dashboard/${uid}/gse/1`,
@@ -78,7 +78,7 @@ export default function UserDashboard({ params }: { params: { uid: string } }) {
     {
       id: 6,
       name: "GSE 2",
-      description: "Intermediate speaking exercises focusing on fluency",
+      description: "Choral Reading of Un-Sanitized Text",
       estimatedTime: 0,
       ...getModuleStatus(6),
       href: `/dashboard/${uid}/gse/2`,
@@ -86,10 +86,18 @@ export default function UserDashboard({ params }: { params: { uid: string } }) {
     {
       id: 7,
       name: "GSE 3",
-      description: "Advanced communication skills and complex topics",
+      description: "Recite Sanitized Text Alone",
       estimatedTime: 0,
       ...getModuleStatus(7),
       href: `/dashboard/${uid}/gse/3`,
+    },
+    {
+      id: 8,
+      name: "GSE 4",
+      description: "Recite Un-sanitized Text Alone",
+      estimatedTime: 0,
+      ...getModuleStatus(8),
+      href: `/dashboard/${uid}/gse/4`,
     },
   ];
 

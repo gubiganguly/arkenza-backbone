@@ -171,6 +171,10 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
   const [currentTopic, setCurrentTopic] = useState<string>("");
   const [currentSubtopic, setCurrentSubtopic] = useState<string>("");
 
+  // Add state to track what was used for the current passage
+  const [displayedTopic, setDisplayedTopic] = useState<string>("");
+  const [displayedSubtopic, setDisplayedSubtopic] = useState<string>("");
+
   // Add this state inside the component function
   const [showIntroModal, setShowIntroModal] = useState(true);
 
@@ -239,7 +243,7 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
   };
 
   const handleFinish = async () => {
-    if (!user) return;
+    if (!user) return; 
 
     try {
       setIsUpdating(true);
@@ -353,8 +357,12 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
       setIsGenerating(true);
       setError(null);
 
+      // Store the current topic/subtopic that will be used for this generation
+      const topicForGeneration = currentTopic;
+      const subtopicForGeneration = currentSubtopic;
+
       // Find the current topic object
-      const topicObj = user?.interests.find(i => i.name === currentTopic);
+      const topicObj = user?.interests.find(i => i.name === topicForGeneration);
       if (!topicObj) {
         throw new Error('Current topic not found');
       }
@@ -388,8 +396,8 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          interest: currentTopic,
-          subInterests: currentSubtopic !== "General" ? [currentSubtopic] : [],
+          interest: topicForGeneration,
+          subInterests: subtopicForGeneration !== "General" ? [subtopicForGeneration] : [],
           userId: params.uid,
           problemWords,
           hideProblemWords,
@@ -425,7 +433,11 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
       // Store new passage start time from API response
       setPassageStartTime(data.startTime);
       
-      // Advance to the next topic/subtopic after successful generation
+      // Update displayed topic/subtopic to match what was generated
+      setDisplayedTopic(topicForGeneration);
+      setDisplayedSubtopic(subtopicForGeneration);
+      
+      // Advance to the next topic/subtopic for the next generation
       advanceToNextTopic();
 
     } catch (err) {
@@ -461,7 +473,7 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
   // Add this just before the interest selector in the JSX
   const wordUsageControls = (
     <div className="flex items-center gap-4 mb-4">
-      <label className="flex items-center gap-2">
+      {/* <label className="flex items-center gap-2">
         <input
           type="checkbox"
           checked={hideProblemWords}
@@ -488,7 +500,7 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
         <span className="text-sm text-gray-600 dark:text-gray-400">Practice Problem Words</span>
-      </label>
+      </label> */}
       
       {/* Add this new temperature control */}
       <div className="flex items-center gap-2 ml-auto">
@@ -518,11 +530,11 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
         <div className="flex flex-col gap-1 w-full md:w-auto">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Topic:</span>
-            <span className="font-medium text-blue-600 dark:text-blue-400">{currentTopic}</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{displayedTopic || currentTopic}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Subtopic:</span>
-            <span className="font-medium text-blue-600 dark:text-blue-400">{currentSubtopic}</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{displayedSubtopic || currentSubtopic}</span>
           </div>
         </div>
         
@@ -746,21 +758,41 @@ export default function ProblemWords({ params }: { params: { uid: string } }) {
         </div>
 
         <div className="mt-8 text-center">
-          <Button
-            onClick={handleFinish}
-            disabled={isUpdating}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isUpdating ? (
-              <span className="flex items-center">
-                Updating...
-              </span>
-            ) : (
-              <span className="flex items-center">
-                Finish
-              </span>
-            )}
-          </Button>
+          <div className="flex items-center justify-center gap-4">
+            <Button
+              onClick={generateNewPassage}
+              disabled={isGenerating || !currentTopic}
+              className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+            >
+              {isGenerating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  Generate New Passage
+                </>
+              )}
+            </Button>
+
+            <Button
+              onClick={handleFinish}
+              disabled={isUpdating}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isUpdating ? (
+                <span className="flex items-center">
+                  Updating...
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  Finish
+                </span>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

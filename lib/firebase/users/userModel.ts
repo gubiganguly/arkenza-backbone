@@ -18,11 +18,12 @@ const usersRef = collection(FIREBASE_DB, COLLECTION_NAME);
 
 const initialModuleStatuses: ModuleStatus[] = [
   { id: 1, isUnlocked: true, isCompleted: false },  // Introduction
-  { id: 2, isUnlocked: false, isCompleted: false }, // Interests
-  { id: 3, isUnlocked: false, isCompleted: false }, // Problem Words
-  { id: 4, isUnlocked: false, isCompleted: false }, // GSE 1
-  { id: 5, isUnlocked: false, isCompleted: false }, // GSE 2
-  { id: 6, isUnlocked: false, isCompleted: false }  // GSE 3
+  { id: 2, isUnlocked: false, isCompleted: false }, // OASES Survey
+  { id: 3, isUnlocked: false, isCompleted: false }, // Interests
+  { id: 4, isUnlocked: false, isCompleted: false }, // Collect Problematic Words
+  { id: 5, isUnlocked: false, isCompleted: false }, // GSE 1
+  { id: 6, isUnlocked: false, isCompleted: false }, // GSE 2
+  { id: 7, isUnlocked: false, isCompleted: false }  // GSE 3
 ];
 
 export const userModel = {
