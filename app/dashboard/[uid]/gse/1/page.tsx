@@ -342,12 +342,14 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       });
       
       if (!response.ok) {
-        let errorData;
         let errorMessage = 'Failed to generate speech';
+        
+        // Clone the response so we can try both JSON and text parsing
+        const responseClone = response.clone();
         
         try {
           // Try to parse as JSON first
-          errorData = await response.json();
+          const errorData = await response.json();
           console.error('TTS API error (JSON):', errorData);
           
           // Better error handling for quota exceeded
@@ -361,9 +363,9 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
             throw new Error(`Failed to generate speech: ${errorData.error || 'Unknown error'}`);
           }
         } catch (jsonError) {
-          // If JSON parsing fails, try to get the text response
+          // If JSON parsing fails, try to get the text response from the clone
           try {
-            const errorText = await response.text();
+            const errorText = await responseClone.text();
             console.error('TTS API error (text):', errorText);
             
             // Check for common error patterns in the text response
@@ -371,12 +373,14 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
               errorMessage = 'ElevenLabs rate limit reached. Please try again in a few minutes.';
             } else if (errorText.toLowerCase().includes('unauthorized') || errorText.toLowerCase().includes('forbidden')) {
               errorMessage = 'API key authentication failed. Please check your ElevenLabs API key.';
-            } else if (errorText.toLowerCase().includes('timeout')) {
-              errorMessage = 'Request timed out. Please try again.';
+            } else if (errorText.toLowerCase().includes('timeout') || errorText.toLowerCase().includes('504')) {
+              errorMessage = 'Request timed out on the server. Please try again with shorter text.';
             } else if (errorText.toLowerCase().includes('function execution timeout')) {
               errorMessage = 'The speech generation took too long on the server. Try with shorter text.';
+            } else if (errorText.toLowerCase().includes('502') || errorText.toLowerCase().includes('503') || errorText.toLowerCase().includes('504')) {
+              errorMessage = 'Server is temporarily unavailable. Please try again in a moment.';
             } else {
-              errorMessage = `Server error (${response.status}): ${errorText.substring(0, 100)}...`;
+              errorMessage = `Server error (${response.status}). Please try again.`;
             }
             
             throw new Error(errorMessage);
