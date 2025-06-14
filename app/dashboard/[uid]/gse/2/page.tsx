@@ -160,6 +160,10 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
   const [currentTopic, setCurrentTopic] = useState<string>("");
   const [currentSubtopic, setCurrentSubtopic] = useState<string>("");
 
+  // Add state to track what was used for the current passage
+  const [displayedTopic, setDisplayedTopic] = useState<string>("");
+  const [displayedSubtopic, setDisplayedSubtopic] = useState<string>("");
+
   // Add temperature control state
   const [temperature, setTemperature] = useState<number>(0.7); // Default to 0.7
 
@@ -387,6 +391,10 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
       setIsPlaying(false);
       setIsPaused(false);
 
+      // Store the current topic/subtopic that will be used for this generation
+      const topicForGeneration = currentTopic;
+      const subtopicForGeneration = currentSubtopic;
+
       // Save current problem words before generating new passage
       await saveUserProblemWords();
 
@@ -405,15 +413,15 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
         });
       }
 
-      // Generate new passage with current topic and subtopic
+      // Generate new passage with stored topic and subtopic
       const response = await fetch('/api/llm', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          interest: currentTopic,
-          subInterests: currentSubtopic !== "General" ? [currentSubtopic] : [],
+          interest: topicForGeneration,
+          subInterests: subtopicForGeneration !== "General" ? [subtopicForGeneration] : [],
           userId: params.uid,
           problemWords,
           hideProblemWords: false,
@@ -461,7 +469,11 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
       // Store temperature in localStorage
       localStorage.setItem('llm-temperature', temperature.toString());
       
-      // Advance to the next topic/subtopic after successful generation
+      // Update displayed topic/subtopic to match what was generated
+      setDisplayedTopic(topicForGeneration);
+      setDisplayedSubtopic(subtopicForGeneration);
+      
+      // Advance to the next topic/subtopic for the next generation
       advanceToNextTopic();
 
       // Generate audio for current text if not pre-generated
@@ -618,11 +630,11 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
         <div className="flex flex-col gap-1 w-full md:w-auto">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Topic:</span>
-            <span className="font-medium text-blue-600 dark:text-blue-400">{currentTopic}</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{displayedTopic || currentTopic}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Subtopic:</span>
-            <span className="font-medium text-blue-600 dark:text-blue-400">{currentSubtopic}</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{displayedSubtopic || currentSubtopic}</span>
           </div>
         </div>
         

@@ -160,6 +160,10 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
   const [currentTopic, setCurrentTopic] = useState<string>("");
   const [currentSubtopic, setCurrentSubtopic] = useState<string>("");
 
+  // Add state to track what was used for the current passage
+  const [displayedTopic, setDisplayedTopic] = useState<string>("");
+  const [displayedSubtopic, setDisplayedSubtopic] = useState<string>("");
+
   // Add temperature control state
   const [temperature, setTemperature] = useState<number>(0.7); // Default to 0.7
 
@@ -232,6 +236,10 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
   const advanceToNextTopic = () => {
     if (!user?.interests || user.interests.length === 0) return;
     
+    console.log('=== Advancing Topic ===');
+    console.log('Before - Topic Index:', currentTopicIndex, 'Subtopic Index:', currentSubtopicIndex);
+    console.log('Before - Topic:', currentTopic, 'Subtopic:', currentSubtopic);
+    
     const currentTopicObj = user.interests[currentTopicIndex];
     const hasSubtopics = currentTopicObj.subInterests && currentTopicObj.subInterests.length > 0;
     
@@ -239,6 +247,7 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
     if (hasSubtopics && currentSubtopicIndex < currentTopicObj.subInterests.length - 1) {
       // Move to next subtopic
       const nextSubtopicIndex = currentSubtopicIndex + 1;
+      console.log('Moving to next subtopic:', nextSubtopicIndex, currentTopicObj.subInterests[nextSubtopicIndex]);
       setCurrentSubtopicIndex(nextSubtopicIndex);
       setCurrentSubtopic(currentTopicObj.subInterests[nextSubtopicIndex]);
     } else {
@@ -248,11 +257,14 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       setCurrentSubtopicIndex(0);
       
       const nextTopic = user.interests[nextTopicIndex];
+      console.log('Moving to next topic:', nextTopicIndex, nextTopic.name);
       setCurrentTopic(nextTopic.name);
       
       if (nextTopic.subInterests && nextTopic.subInterests.length > 0) {
+        console.log('Setting first subtopic:', nextTopic.subInterests[0]);
         setCurrentSubtopic(nextTopic.subInterests[0]);
       } else {
+        console.log('Setting subtopic to General');
         setCurrentSubtopic("General");
       }
     }
@@ -378,6 +390,21 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       setIsPlaying(false);
       setIsPaused(false);
 
+      // Store the current topic/subtopic that will be used for this generation
+      const topicForGeneration = currentTopic;
+      const subtopicForGeneration = currentSubtopic;
+      
+      // Debug logging to help identify the issue
+      console.log('=== GSE 1 Generation Debug ===');
+      console.log('Current Topic Index:', currentTopicIndex);
+      console.log('Current Subtopic Index:', currentSubtopicIndex);
+      console.log('Current Topic:', currentTopic);
+      console.log('Current Subtopic:', currentSubtopic);
+      console.log('Topic for Generation:', topicForGeneration);
+      console.log('Subtopic for Generation:', subtopicForGeneration);
+      console.log('Displayed Topic:', displayedTopic);
+      console.log('Displayed Subtopic:', displayedSubtopic);
+
       // Save current problem words before generating new passage
       await saveUserProblemWords();
 
@@ -396,15 +423,15 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
         });
       }
 
-      // Generate new passage with current topic and subtopic
+      // Generate new passage with stored topic and subtopic
       const response = await fetch('/api/llm', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          interest: currentTopic,
-          subInterests: currentSubtopic !== "General" ? [currentSubtopic] : [],
+          interest: topicForGeneration,
+          subInterests: subtopicForGeneration !== "General" ? [subtopicForGeneration] : [],
           userId: params.uid,
           problemWords,
           hideProblemWords: true,
@@ -452,8 +479,16 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       // Store temperature in localStorage
       localStorage.setItem('llm-temperature', temperature.toString());
       
-      // Advance to the next topic/subtopic after successful generation
+      // Update displayed topic/subtopic to match what was generated
+      setDisplayedTopic(topicForGeneration);
+      setDisplayedSubtopic(subtopicForGeneration);
+      console.log('Updated displayed topic/subtopic:', topicForGeneration, subtopicForGeneration);
+      
+      // Advance to the next topic/subtopic for the next generation
       advanceToNextTopic();
+      
+      // Note: State updates are async, so the logged values might not reflect the new state immediately
+      console.log('After advance - Current Topic:', currentTopic, 'Current Subtopic:', currentSubtopic);
 
       // Generate audio for current text if not pre-generated
       if (data.text && data.text !== "Click generate to create a new passage.") {
@@ -618,11 +653,11 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
         <div className="flex flex-col gap-1 w-full md:w-auto">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Topic:</span>
-            <span className="font-medium text-blue-600 dark:text-blue-400">{currentTopic}</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{displayedTopic || currentTopic}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Subtopic:</span>
-            <span className="font-medium text-blue-600 dark:text-blue-400">{currentSubtopic}</span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{displayedSubtopic || currentSubtopic}</span>
           </div>
         </div>
         
