@@ -325,16 +325,11 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
     try {
       setIsTTSLoading(true);
       
-      // More aggressive text length limit for Vercel deployment
-      const maxChars = 1000; // Reduced to prevent timeouts
+      // Limit text length to prevent quota issues
+      const maxChars = 2000; // Conservative limit
       const textToSynthesize = text.length > maxChars ? 
         text.substring(0, maxChars) + "..." : 
         text;
-      
-      // Show warning if text is being truncated
-      if (text.length > maxChars) {
-        console.warn(`Text truncated from ${text.length} to ${maxChars} characters for TTS`);
-      }
       
       const response = await fetch('/api/tts/elevenlabs', {
         method: 'POST',
@@ -347,55 +342,18 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       });
       
       if (!response.ok) {
-        let errorMessage = 'Failed to generate speech';
+        const errorData = await response.json();
+        console.error('TTS API error:', errorData);
         
-        // Clone the response so we can try both JSON and text parsing
-        const responseClone = response.clone();
-        
-        try {
-          // Try to parse as JSON first
-          const errorData = await response.json();
-          console.error('TTS API error (JSON):', errorData);
-          
-          // Better error handling for quota exceeded
-          if (errorData.details && errorData.details.includes("quota_exceeded")) {
-            throw new Error('ElevenLabs rate limit reached. Please try again in a few minutes.');
-          } else if (errorData.status === 401 || errorData.status === 403) {
-            throw new Error('API key authentication failed. Please check your ElevenLabs API key.');
-          } else if (errorData.status === 429) {
-            throw new Error('Rate limit exceeded. Please try again later.');
-          } else {
-            throw new Error(`Failed to generate speech: ${errorData.error || 'Unknown error'}`);
-          }
-        } catch (jsonError) {
-          // If JSON parsing fails, try to get the text response from the clone
-          try {
-            const errorText = await responseClone.text();
-            console.error('TTS API error (text):', errorText);
-            
-            // Check for common error patterns in the text response
-            if (errorText.toLowerCase().includes('quota')) {
-              errorMessage = 'ElevenLabs rate limit reached. Please try again in a few minutes.';
-            } else if (errorText.toLowerCase().includes('unauthorized') || errorText.toLowerCase().includes('forbidden')) {
-              errorMessage = 'API key authentication failed. Please check your ElevenLabs API key.';
-            } else if (errorText.toLowerCase().includes('timeout') || errorText.toLowerCase().includes('504')) {
-              errorMessage = 'Request timed out on the server. Please try again with shorter text.';
-            } else if (errorText.toLowerCase().includes('function_invocation_timeout') || errorText.toLowerCase().includes('function execution timeout')) {
-              errorMessage = 'The server took too long to process your request. Please try again with shorter text.';
-            } else if (errorText.toLowerCase().includes('elevenlabs api request timed out')) {
-              errorMessage = 'ElevenLabs API is taking too long to respond. Please try again in a moment.';
-            } else if (errorText.toLowerCase().includes('502') || errorText.toLowerCase().includes('503') || errorText.toLowerCase().includes('504')) {
-              errorMessage = 'Server is temporarily unavailable. Please try again in a moment.';
-            } else {
-              errorMessage = `Server error (${response.status}). Please try again.`;
-            }
-            
-            throw new Error(errorMessage);
-          } catch (textError) {
-            // If both JSON and text parsing fail, use a generic error
-            console.error('Could not parse error response:', jsonError, textError);
-            throw new Error(`Server error (${response.status}). Please try again.`);
-          }
+        // Better error handling for quota exceeded
+        if (errorData.details && errorData.details.includes("quota_exceeded")) {
+          throw new Error('ElevenLabs rate limit reached. Please try again in a few minutes.');
+        } else if (errorData.status === 401 || errorData.status === 403) {
+          throw new Error('API key authentication failed. Please check your ElevenLabs API key.');
+        } else if (errorData.status === 429) {
+          throw new Error('Rate limit exceeded. Please try again later.');
+        } else {
+          throw new Error(`Failed to generate speech: ${errorData.error || 'Unknown error'}`);
         }
       }
       
