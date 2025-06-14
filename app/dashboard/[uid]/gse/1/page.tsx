@@ -342,18 +342,49 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('TTS API error:', errorData);
+        let errorData;
+        let errorMessage = 'Failed to generate speech';
         
-        // Better error handling for quota exceeded
-        if (errorData.details && errorData.details.includes("quota_exceeded")) {
-          throw new Error('ElevenLabs rate limit reached. Please try again in a few minutes.');
-        } else if (errorData.status === 401 || errorData.status === 403) {
-          throw new Error('API key authentication failed. Please check your ElevenLabs API key.');
-        } else if (errorData.status === 429) {
-          throw new Error('Rate limit exceeded. Please try again later.');
-        } else {
-          throw new Error(`Failed to generate speech: ${errorData.error || 'Unknown error'}`);
+        try {
+          // Try to parse as JSON first
+          errorData = await response.json();
+          console.error('TTS API error (JSON):', errorData);
+          
+          // Better error handling for quota exceeded
+          if (errorData.details && errorData.details.includes("quota_exceeded")) {
+            throw new Error('ElevenLabs rate limit reached. Please try again in a few minutes.');
+          } else if (errorData.status === 401 || errorData.status === 403) {
+            throw new Error('API key authentication failed. Please check your ElevenLabs API key.');
+          } else if (errorData.status === 429) {
+            throw new Error('Rate limit exceeded. Please try again later.');
+          } else {
+            throw new Error(`Failed to generate speech: ${errorData.error || 'Unknown error'}`);
+          }
+        } catch (jsonError) {
+          // If JSON parsing fails, try to get the text response
+          try {
+            const errorText = await response.text();
+            console.error('TTS API error (text):', errorText);
+            
+            // Check for common error patterns in the text response
+            if (errorText.toLowerCase().includes('quota')) {
+              errorMessage = 'ElevenLabs rate limit reached. Please try again in a few minutes.';
+            } else if (errorText.toLowerCase().includes('unauthorized') || errorText.toLowerCase().includes('forbidden')) {
+              errorMessage = 'API key authentication failed. Please check your ElevenLabs API key.';
+            } else if (errorText.toLowerCase().includes('timeout')) {
+              errorMessage = 'Request timed out. Please try again.';
+            } else if (errorText.toLowerCase().includes('function execution timeout')) {
+              errorMessage = 'The speech generation took too long on the server. Try with shorter text.';
+            } else {
+              errorMessage = `Server error (${response.status}): ${errorText.substring(0, 100)}...`;
+            }
+            
+            throw new Error(errorMessage);
+          } catch (textError) {
+            // If both JSON and text parsing fail, use a generic error
+            console.error('Could not parse error response:', jsonError, textError);
+            throw new Error(`Server error (${response.status}). Please try again.`);
+          }
         }
       }
       

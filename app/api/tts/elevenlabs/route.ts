@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
+    // Add timeout to prevent Vercel function timeout issues
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timeout')), 25000); // 25 seconds, less than Vercel's 30s limit
+    });
+    
+    const requestPromise = processRequest(request);
+    
+    return await Promise.race([requestPromise, timeoutPromise]);
+  } catch (error) {
+    console.error('Unexpected error in TTS API:', error);
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : String(error)
+      }, 
+      { status: 500 }
+    );
+  }
+}
+
+async function processRequest(request: NextRequest) {
+  try {
     const { text } = await request.json();
 
     if (!text) {
@@ -66,9 +88,14 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         // If not JSON, get the text response
-        const errorText = await response.text();
-        console.error('Eleven Labs error response (text):', errorText);
-        errorDetails = errorText;
+        try {
+          const errorText = await response.text();
+          console.error('Eleven Labs error response (text):', errorText);
+          errorDetails = errorText;
+        } catch (textError) {
+          console.error('Could not parse error response:', textError);
+          errorDetails = 'Unknown error format';
+        }
       }
       
       return NextResponse.json(
@@ -94,7 +121,21 @@ export async function POST(request: NextRequest) {
     });
     
   } catch (error) {
-    console.error('Error in Eleven Labs TTS API:', error);
+    console.error('Error in processRequest:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message === 'Request timeout') {
+        return NextResponse.json(
+          { 
+            error: 'Request timeout',
+            details: 'The speech generation request took too long. Please try with shorter text or try again later.'
+          }, 
+          { status: 408 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { 
         error: 'Internal server error',
@@ -103,4 +144,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
