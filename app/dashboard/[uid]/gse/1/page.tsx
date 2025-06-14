@@ -325,11 +325,16 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
     try {
       setIsTTSLoading(true);
       
-      // Limit text length to prevent quota issues
-      const maxChars = 2000; // Conservative limit
+      // More aggressive text length limit for Vercel deployment
+      const maxChars = 1000; // Reduced to prevent timeouts
       const textToSynthesize = text.length > maxChars ? 
         text.substring(0, maxChars) + "..." : 
         text;
+      
+      // Show warning if text is being truncated
+      if (text.length > maxChars) {
+        console.warn(`Text truncated from ${text.length} to ${maxChars} characters for TTS`);
+      }
       
       const response = await fetch('/api/tts/elevenlabs', {
         method: 'POST',
@@ -375,8 +380,10 @@ export default function GSE1Page({ params }: { params: { uid: string } }) {
               errorMessage = 'API key authentication failed. Please check your ElevenLabs API key.';
             } else if (errorText.toLowerCase().includes('timeout') || errorText.toLowerCase().includes('504')) {
               errorMessage = 'Request timed out on the server. Please try again with shorter text.';
-            } else if (errorText.toLowerCase().includes('function execution timeout')) {
-              errorMessage = 'The speech generation took too long on the server. Try with shorter text.';
+            } else if (errorText.toLowerCase().includes('function_invocation_timeout') || errorText.toLowerCase().includes('function execution timeout')) {
+              errorMessage = 'The server took too long to process your request. Please try again with shorter text.';
+            } else if (errorText.toLowerCase().includes('elevenlabs api request timed out')) {
+              errorMessage = 'ElevenLabs API is taking too long to respond. Please try again in a moment.';
             } else if (errorText.toLowerCase().includes('502') || errorText.toLowerCase().includes('503') || errorText.toLowerCase().includes('504')) {
               errorMessage = 'Server is temporarily unavailable. Please try again in a moment.';
             } else {

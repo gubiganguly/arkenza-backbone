@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Add timeout to prevent Vercel function timeout issues
+    // Add aggressive timeout to prevent Vercel function timeout issues
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), 25000); // 25 seconds, less than Vercel's 30s limit
+      setTimeout(() => reject(new Error('Request timeout')), 15000); // 15 seconds to leave buffer for Vercel
     });
     
     const requestPromise = processRequest(request);
@@ -33,6 +33,15 @@ async function processRequest(request: NextRequest) {
       );
     }
 
+    // Limit text length more aggressively for Vercel deployment
+    const maxChars = 1000; // Reduced from 2000 to prevent timeouts
+    if (text.length > maxChars) {
+      return NextResponse.json(
+        { error: `Text too long. Maximum ${maxChars} characters allowed.` },
+        { status: 400 }
+      );
+    }
+
     // Check if API key is configured
     if (!process.env.ELEVENLABS_API_KEY) {
       console.error('ELEVENLABS_API_KEY is not set in environment variables');
@@ -45,26 +54,43 @@ async function processRequest(request: NextRequest) {
     // Default voice ID - you can make this configurable if needed
     const voiceId = "EXAVITQu4vr4xnSDxMaL";
     
-    console.log('Making request to Eleven Labs API');
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      {
-        method: 'POST',
-        headers: {
-          'Accept': 'audio/mpeg',
-          'Content-Type': 'application/json',
-          'xi-api-key': `${process.env.ELEVENLABS_API_KEY}`,
-        },
-        body: JSON.stringify({
-          text: text,
-          model_id: 'eleven_monolingual_v1',
-          voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.5
-          }
-        }),
+    console.log('Making request to Eleven Labs API with text length:', text.length);
+    
+    // Add timeout to the fetch request itself
+    const controller = new AbortController();
+    const fetchTimeout = setTimeout(() => controller.abort(), 12000); // 12 seconds for the API call
+    
+    let response;
+    try {
+      response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+        {
+          method: 'POST',
+          headers: {
+            'Accept': 'audio/mpeg',
+            'Content-Type': 'application/json',
+            'xi-api-key': `${process.env.ELEVENLABS_API_KEY}`,
+          },
+          body: JSON.stringify({
+            text: text,
+            model_id: 'eleven_monolingual_v1',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.5
+            }
+          }),
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(fetchTimeout);
+    } catch (error) {
+      clearTimeout(fetchTimeout);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('ElevenLabs API request timed out');
       }
-    );
+      throw error;
+    }
 
     console.log('Eleven Labs response status:', response.status);
     
