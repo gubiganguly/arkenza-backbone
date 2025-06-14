@@ -8,7 +8,7 @@ import TextHighlighter from "@/app/components/text-highlighter/TextHighlighter";
 import { userModel } from "@/lib/firebase/users/userModel";
 import { User, ProblemWord } from "@/lib/firebase/users/userSchema";
 import { useRouter } from "next/navigation";
-import { RefreshCw, BookOpen, Mic, Brain, ArrowRight, Heart, Scale, Info, Play, Pause } from "lucide-react";
+import { RefreshCw, BookOpen, Mic, Brain, ArrowRight, Heart, Scale, Info, Play, Pause, RotateCcw } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -169,6 +169,15 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
   // Add a loading state for TTS
   const [isTTSLoading, setIsTTSLoading] = useState(false);
 
+  // Add state for pre-generated audio
+  const [preGeneratedAudioUrl, setPreGeneratedAudioUrl] = useState<string | null>(null);
+
+  // Add state to track if audio is paused
+  const [isPaused, setIsPaused] = useState(false);
+
+  // Add state for playback speed
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.0);
+
   useEffect(() => {
     const loadUser = async () => {
       const userData = await userModel.getById(params.uid);
@@ -203,7 +212,21 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
     if (savedTemp) {
       setTemperature(Number(savedTemp));
     }
+    
+    const savedSpeed = localStorage.getItem('tts-playback-speed');
+    if (savedSpeed) {
+      setPlaybackSpeed(Number(savedSpeed));
+    }
   }, []);
+
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (preGeneratedAudioUrl) {
+        URL.revokeObjectURL(preGeneratedAudioUrl);
+      }
+    };
+  }, [preGeneratedAudioUrl]);
 
   // Add this function to advance to the next topic/subtopic
   const advanceToNextTopic = () => {
@@ -285,6 +308,71 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
     }
   };
 
+  // Add function to pre-generate TTS
+  const generateTTSAudio = async (text: string) => {
+    try {
+      setIsTTSLoading(true);
+      
+      // Limit text length to prevent quota issues
+      const maxChars = 2000; // Conservative limit
+      const textToSynthesize = text.length > maxChars ? 
+        text.substring(0, maxChars) + "..." : 
+        text;
+      
+      const response = await fetch('/api/tts/elevenlabs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: textToSynthesize
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('TTS API error:', errorData);
+        
+        // Better error handling for quota exceeded
+        if (errorData.details && errorData.details.includes("quota_exceeded")) {
+          throw new Error('ElevenLabs rate limit reached. Please try again in a few minutes.');
+        } else if (errorData.status === 401 || errorData.status === 403) {
+          throw new Error('API key authentication failed. Please check your ElevenLabs API key.');
+        } else if (errorData.status === 429) {
+          throw new Error('Rate limit exceeded. Please try again later.');
+        } else {
+          throw new Error(`Failed to generate speech: ${errorData.error || 'Unknown error'}`);
+        }
+      }
+      
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      // Clean up old audio URL to prevent memory leaks
+      if (preGeneratedAudioUrl) {
+        URL.revokeObjectURL(preGeneratedAudioUrl);
+      }
+      
+      setPreGeneratedAudioUrl(audioUrl);
+      // Reset paused state when new audio is generated
+      setIsPaused(false);
+    } catch (error) {
+      console.error('Error pre-generating TTS:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate speech. Please try again.');
+    } finally {
+      setIsTTSLoading(false);
+    }
+  };
+
+  // Add function to handle playback speed changes
+  const handleSpeedChange = (speed: number) => {
+    setPlaybackSpeed(speed);
+    localStorage.setItem('tts-playback-speed', speed.toString());
+    if (audioRef.current) {
+      audioRef.current.playbackRate = speed;
+    }
+  };
+
   // Modify the generateNewPassage function to use current topic/subtopic
   const generateNewPassage = async () => {
     if (!currentTopic) {
@@ -295,6 +383,9 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
     try {
       setIsGenerating(true);
       setError(null);
+      // Reset audio states when generating new passage
+      setIsPlaying(false);
+      setIsPaused(false);
 
       // Save current problem words before generating new passage
       await saveUserProblemWords();
@@ -373,6 +464,11 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
       // Advance to the next topic/subtopic after successful generation
       advanceToNextTopic();
 
+      // Generate audio for current text if not pre-generated
+      if (data.text && data.text !== "Click generate to create a new passage.") {
+        await generateTTSAudio(data.text);
+      }
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate text');
       console.error('Error generating text:', err);
@@ -432,66 +528,57 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
 
   // Update the toggleTTS function with better error handling and text chunking
   const toggleTTS = async () => {
+    // If currently playing, pause it
     if (isPlaying && audioRef.current) {
       audioRef.current.pause();
       setIsPlaying(false);
+      setIsPaused(true);
       return;
     }
     
-    try {
-      setIsTTSLoading(true);
-      setError(null); // Clear any previous errors
+    // If paused, resume from current position
+    if (isPaused && audioRef.current) {
+      audioRef.current.playbackRate = playbackSpeed; // Apply current speed
+      audioRef.current.play();
+      setIsPlaying(true);
+      setIsPaused(false);
+      return;
+    }
+    
+    // If we have pre-generated audio, start from beginning
+    if (preGeneratedAudioUrl && audioRef.current) {
+      audioRef.current.src = preGeneratedAudioUrl;
+      audioRef.current.playbackRate = playbackSpeed; // Apply current speed
+      audioRef.current.play();
+      setIsPlaying(true);
+      setIsPaused(false);
       
-      // Limit text length to prevent quota issues
-      const maxChars = 2000; // Conservative limit
-      const textToSynthesize = generatedText.length > maxChars ? 
-        generatedText.substring(0, maxChars) + "..." : 
-        generatedText;
-      
-      const response = await fetch('/api/tts/elevenlabs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: textToSynthesize
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('TTS API error:', errorData);
-        
-        // Better error handling for quota exceeded
-        if (errorData.details && errorData.details.includes("quota_exceeded")) {
-          throw new Error('ElevenLabs rate limit reached. Please try again in a few minutes.');
-        } else if (errorData.status === 401 || errorData.status === 403) {
-          throw new Error('API key authentication failed. Please check your ElevenLabs API key.');
-        } else if (errorData.status === 429) {
-          throw new Error('Rate limit exceeded. Please try again later.');
-        } else {
-          throw new Error(`Failed to generate speech: ${errorData.error || 'Unknown error'}`);
-        }
+      audioRef.current.onended = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
+    } else {
+      // Generate audio for current text if not pre-generated
+      if (generatedText && generatedText !== "Click generate to create a new passage.") {
+        await generateTTSAudio(generatedText);
       }
+    }
+  };
+
+  // Add function to restart TTS from beginning
+  const restartTTS = () => {
+    if (preGeneratedAudioUrl && audioRef.current) {
+      audioRef.current.src = preGeneratedAudioUrl;
+      audioRef.current.currentTime = 0; // Ensure we start from the beginning
+      audioRef.current.playbackRate = playbackSpeed; // Apply current speed
+      audioRef.current.play();
+      setIsPlaying(true);
+      setIsPaused(false);
       
-      const audioBlob = await response.blob();
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.src = audioUrl;
-        audioRef.current.play();
-        setIsPlaying(true);
-        
-        audioRef.current.onended = () => {
-          setIsPlaying(false);
-        };
-      }
-    } catch (error) {
-      console.error('Error with TTS:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate speech. Please try again.');
-    } finally {
-      setIsTTSLoading(false);
+      audioRef.current.onended = () => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
     }
   };
 
@@ -547,7 +634,7 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
           {isGenerating ? (
             <>
               <RefreshCw className="h-4 w-4 animate-spin" />
-              Generating...
+              {isTTSLoading ? 'Preparing Audio...' : 'Generating...'}
             </>
           ) : (
             <>
@@ -630,28 +717,98 @@ export default function GSE2Page({ params }: { params: { uid: string } }) {
 
             <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6">
               <div className="mb-4">
-                <Button
-                  onClick={toggleTTS}
-                  disabled={isTTSLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-                >
-                  {isTTSLoading ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 animate-spin" />
-                      Loading Audio...
-                    </>
-                  ) : isPlaying ? (
-                    <>
-                      <Pause className="h-4 w-4" />
-                      Pause Choral Reading
-                    </>
-                  ) : (
-                    <>
-                      <Play className="h-4 w-4" />
-                      Begin Choral Reading
-                    </>
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={toggleTTS}
+                    disabled={isTTSLoading || (!preGeneratedAudioUrl && generatedText === "Click generate to create a new passage.")}
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isTTSLoading ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        Preparing Audio...
+                      </>
+                    ) : isPlaying ? (
+                      <>
+                        <Pause className="h-4 w-4" />
+                        Pause Choral Reading
+                      </>
+                    ) : isPaused ? (
+                      <>
+                        <Play className="h-4 w-4" />
+                        Continue Choral Reading
+                      </>
+                    ) : !preGeneratedAudioUrl ? (
+                      <>
+                        <Play className="h-4 w-4" />
+                        {generatedText === "Click generate to create a new passage." ? "Generate passage first" : "Prepare Audio"}
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4" />
+                        Begin Choral Reading
+                      </>
+                    )}
+                  </Button>
+                  
+                  {/* Start from Beginning button - only show when audio is available and playback has started */}
+                  {preGeneratedAudioUrl && !isTTSLoading && (isPlaying || isPaused) && (
+                    <Button
+                      onClick={restartTTS}
+                      className="bg-gray-600 hover:bg-gray-700 text-white flex items-center gap-2"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Start from Beginning
+                    </Button>
                   )}
-                </Button>
+                  
+                  {preGeneratedAudioUrl && !isTTSLoading && (
+                    <span className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></div>
+                      Audio Ready
+                    </span>
+                  )}
+                </div>
+                
+                {/* Speed Control Slider */}
+                {preGeneratedAudioUrl && !isTTSLoading && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[40px]">Speed:</span>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="2"
+                        step="0.1"
+                        value={playbackSpeed}
+                        onChange={(e) => handleSpeedChange(Number(e.target.value))}
+                        className="flex-1 max-w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 
+                                   [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 
+                                   [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-600 
+                                   [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg
+                                   [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full 
+                                   [&::-moz-range-thumb]:bg-blue-600 [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                      />
+                      <span className="text-sm text-blue-600 dark:text-blue-400 min-w-[30px]">{playbackSpeed.toFixed(1)}x</span>
+                    </div>
+                    <div className="flex items-center gap-2 ml-[44px]">
+                      {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((speed) => (
+                        <button
+                          key={speed}
+                          onClick={() => handleSpeedChange(speed)}
+                          className={`px-2 py-1 text-xs rounded transition-colors ${
+                            Math.abs(playbackSpeed - speed) < 0.05
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {speed}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 <audio ref={audioRef} className="hidden" />
               </div>
               
